@@ -66,6 +66,20 @@ logger.info('PDFSense server started');
 app.use(json({ pretty: true, param: 'pretty' }))
 
 
+router.param('sharp_command', (output, ctx, next) => {
+	console.log('sharp command found!')
+	console.log(ctx.path)
+	console.log(ctx.params)
+	return next();
+})
+
+router.param('tesseract_command', (output, ctx, next) => {
+	console.log('tesseract command found!')
+	if (!['pdf','text'].includes(output)) throw(new Error('Tesseract path must end with /pdf or /text'))
+	return next();
+})
+
+
 // ROUTES
 router.get('/', async function (ctx) {
 	ctx.body = 'PDFSense here. Poppler-utils, Tesseract OCR and CLD language detection at your service.';
@@ -99,25 +113,26 @@ router.post('/api/uploads/:fileid/rendered/images', async function (ctx) {
 	ctx.body = result
 })
 
-router.post('/api/uploads/:fileid/extracted/images/ocr', async function (ctx) {
-	const result = await pdfsense.tesseract(ctx.params.fileid, ctx.body, ctx.path, 'txt')
-	ctx.body = result
-})
+
 
 router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
 	console.log(ctx.params.fileid)
 	ctx.body = {}
 })
 
-router.post('/api/uploads/:fileid/rendered/images', async function (ctx) {
-	console.log(ctx.params.fileid)
-	ctx.body = {}
-})
 
-router.post('/api/uploads/:fileid/rendered/images/ocr', async function (ctx) {
-	const result = await pdfsense.tesseract(ctx.params.fileid, ctx.body, ctx.path)
+// catch sharp commands
+router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
+	const result = await pdfsense.sharp(ctx.params.fileid, ctx.body, ctx.path, ctx.params.sharp_command)
 	ctx.body = result
-})
+});
+
+// catch tesseract commands
+router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async function (ctx, next) {
+	const result = await pdfsense.tesseract(ctx.params.fileid, ctx.body, ctx.path, ctx.params.tesseract_command)
+	ctx.body = result
+
+});
 
 router.delete('/api/uploads/:fileid', async function (ctx) {
 	ctx.body = 'PDFSense here';

@@ -40,4 +40,12 @@ Now we can extract images from PDF
 
 Let's apply some processing to these images. In this case we do OCR.
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/ocr?language=fin
+        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/tesseract/text?language=fin
+
+Or, we can rotate images
+
+        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate?angle=90
+
+and THEN do OCR
+
+        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate/tesseract/text?language=fin

@@ -5,6 +5,7 @@ var fsp 			= require('fs').promises;
 const util 			= require('util');
 const stream 		= require('stream')
 const path			= require('path')
+const sharp 		= require('sharp');
 const {v1:uuid} 	= require('uuid');
 const { Poppler } 	= require("node-poppler");
 
@@ -25,7 +26,7 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'extracted/images'
 		const filepath = path.join(input_path, filename)
-		await this.createDirs(file_id, output_path)
+		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFImages(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
 		var response = {files: files}
@@ -37,32 +38,55 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'rendered/images'
 		const filepath = path.join(input_path, filename)
-		await this.createDirs(file_id, output_path)
+		//await this.createDirs(file_id, output_path)
+		await fsp.mkdir(path.join(input_path, out_path), { recursive: true })
 		await this.PDFToPpm(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
 		var response = {files: files}
 		return response
 	}
 
-	async tesseract(file_id, options, url_path, output) {
+	async tesseract(file_id, options, url_path, output_type) {
+		const command_path = `/tesseract/${output_type}`
+		console.log(command_path)
 		var p = url_path.split(file_id)[1]
-		var filepath = path.join(ROOT, file_id, p.replace('/ocr',''))
-		var files = await fsp.readdir(filepath)
-		const filelist = files.map(x => path.join(filepath, x))
-		if(!output) await this.tesseractToPDF(filelist, options)
-		else await this.tesseractToTextFile(filelist, {l:'fin'})
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		var files = await this.getFileList(input_path)
+
+		if(output_type === 'pdf') await this.tesseractToPDF(filelist, options, out_path)
+		else await this.tesseractToTextFile(filelist, {l:'fin'}, out_path)
 	}
 
-	async tesseractToTextFile(filelist, options) {
+	async sharp(file_id, options, url_path, command) {
+		const command_path = `/sharp/${command}`
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		var files = await this.getFileList(input_path)
+		await fsp.mkdir(out_path, { recursive: true })
+		//const filelist = files.map(x => path.join(input_path, x))
+		for(const f of files) {
+			await sharp(path.join(input_path, f)).rotate(90).toFile(path.join(out_path, f))
+
+		}
+
+	}
+
+	async tesseractToTextFile(filelist, options, out_path) {
+		await fsp.mkdir(out_path, { recursive: true })
 		const tesseract = require("node-tesseract-ocr")
+		let result = []
 		for(const f of filelist) {
 			const used = process.memoryUsage().heapUsed / 1024 / 1024;
 			console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
-			console.log('OCR: ' + f)
+			console.log('processing ' + f)
 			const text = await tesseract.recognize(f, options)
-			await fsp.writeFile(path.join('tmp', path.basename(f) + '.txt'), text, 'utf8')
+			await fsp.writeFile(path.join(out_path, path.basename(f) + '.txt'), text, 'utf8')
+			result.push(text)
 			//await this.saveText(text, path.join(ROOT, file_id, p))
 		}
+		await fsp.writeFile(path.join(out_path, 'fulltext.txt'), result.join('\n'), 'utf8')
 		return 'done'
 	}
 
@@ -73,7 +97,7 @@ class PDFSense {
 	}
 
 	getFilenameFromFileID(file_id) {
-		return file_id.split('-')[1]
+		return file_id.split('-')[0]
 	}
 
 
@@ -168,20 +192,6 @@ class PDFSense {
 	}
 
 
-	async createPageImage(pdf_id, page) {
-		var file = path.join('data', pdf_id)
-		var pdfImage = new PDFImage(file);
-
-		//var imagepath = 'tmp/'
-
-		pdfImage.convertPage(0).then(function (imagepath) {
-			console.log(imagepath)
-		  // 0-th page (first page) of the slide.pdf is available as slide-0.png
-		  fs.existsSync("/tmp/slide-0.png") // => true
-		});
-
-	}
-
 	async removePDF(pdf_id) {
 
 
@@ -211,11 +221,19 @@ class PDFSense {
 		}
 	}
 
+	async getFileList(input_path) {
+		var files = await fsp.readdir(input_path, { withFileTypes: true })
+		return files
+			.filter(dirent => dirent.isFile())
+        	.map(dirent => dirent.name)
+			.map(x => path.join(input_path, x))
+	}
+
 	createFileID(filename) {
 		function pad2(n) { return n < 10 ? '0' + n : n }
 		var date = new Date();
 		var t = date.getFullYear().toString() +'.'+ pad2(date.getMonth() + 1) +'.'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) +':'+ pad2( date.getMinutes() ) +':'+ pad2( date.getSeconds() )
-		return t + '-' + filename
+		return filename + '-' + t
 	}
 
 
