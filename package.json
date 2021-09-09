@@ -1,0 +1,33 @@
+{
+  "name": "pdfsense",
+  "version": "1.0.0",
+  "description": "Various PDF tools combined",
+  "main": "pdfsense.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OSC-JYU/PDFsense.git"
+  },
+  "author": "Ari Häyrinen",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/OSC-JYU/PDFsense/issues"
+  },
+  "homepage": "https://github.com/OSC-JYU/PDFsense#readme",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "koa": "^2.13.1",
+    "koa-body": "^4.2.0",
+    "koa-json": "^2.0.2",
+    "koa-router": "^10.0.0",
+    "node-poppler": "^3.0.0",
+    "node-tesseract-ocr": "^2.2.1",
+    "sanitize-filename": "^1.6.3",
+    "sharp": "^0.29.1",
+    "uuid": "^8.3.2",
+    "winston": "^3.3.3",
+    "winston-daily-rotate-file": "^4.5.4"
+  }
+}

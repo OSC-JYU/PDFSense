@@ -1,0 +1,31 @@
+
+PDF OCR
+
+ mkdir images -p && pdftoppm -r 300 -cropbox 2000.pdf images/page
+
+ mkdir images -p && pdftoppm -cropbox 2000.pdf images/page
+
+tesseract -l fin files.txt out pdf
+
+tesseract -l fin files.txt out
+
+
+
+
+docker run -v=/home/arihayri/Documents/OMEKA-korttisiirto:/output johnpaulada/noteshrink /output/vaik-000.jpg -o /output/output.pdf
+
+
+OCR Rest
+
+
+POST /pdftoimages
+params
+engine: pdfimages, pdfppm
+options: object
+
+
+/noteshrink
+
+images:list of images
+
+return list of processed images
