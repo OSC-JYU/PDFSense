@@ -6,8 +6,9 @@ PDFSense combines several open source PDF, image and text tools to one REST API.
 PDFSense also **stores the output of every endpoint**. This allows you to upload original input once and then experiment with processing endpoint without the need to upload original data again and again.
 
 ## Typical OCR workflow (using execellent httpie for making requests)
-1. upload PDF
-This gives us an upload ID, that you can use in processing endpoints.
+### 1. upload PDF
+
+This gives us an upload ID, that you can be used in processing endpoints.
 
         http --form POST :8200/api/uploads file@myfile.pdf
 
@@ -23,7 +24,8 @@ This gives us an upload ID, that you can use in processing endpoints.
 
 
 
-2. Exract images
+### 2. Exract images
+
 Now we can extract images from PDF
 
         http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images
@@ -34,7 +36,8 @@ Now we can extract images from PDF
 
     We can now refer to extracted images by path "/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images".
 
-3. process images (OCR)
+### 3. process images (OCR)
+
 Let's apply some processing to these images. In this case we do OCR.
 
         http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/ocr?language=fin
