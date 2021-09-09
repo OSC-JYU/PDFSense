@@ -8,11 +8,10 @@ PDFSense also **stores the output of every endpoint**. This allows you to upload
 ## Typical OCR workflow (using execellent httpie for making requests)
 ### 1. upload PDF
 
-This gives us an upload ID, that you can be used in processing endpoints.
 
         http --form POST :8200/api/uploads file@myfile.pdf
 
-    This returns upload id and some other information
+This returns upload id and some other information
 
         {
         "fileid": "2021.09.09_08:29:32-myfile.pdf",
@@ -30,13 +29,13 @@ Now we can extract images from PDF
 
         http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images
 
-    This returns a list of images
+This returns a list of images
 
         {"files":["page-000.jpg","page-001.jpg" ... ]}
 
     We can now refer to extracted images by path "/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images".
 
-### 3. process images (OCR)
+### 3. Process images 
 
 Let's apply some processing to these images. In this case we do OCR.
 

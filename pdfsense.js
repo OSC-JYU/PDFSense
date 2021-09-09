@@ -54,8 +54,8 @@ class PDFSense {
 		const out_path =  path.join(ROOT, file_id, p)
 		var files = await this.getFileList(input_path)
 
-		if(output_type === 'pdf') await this.tesseractToPDF(filelist, options, out_path)
-		else await this.tesseractToTextFile(filelist, {l:'fin'}, out_path)
+		if(output_type === 'pdf') await this.tesseractToPDF(files, options, out_path)
+		else await this.tesseractToTextFile(files, {l:'fin'}, out_path)
 	}
 
 	async sharp(file_id, options, url_path, command) {
@@ -84,9 +84,10 @@ class PDFSense {
 			const text = await tesseract.recognize(f, options)
 			await fsp.writeFile(path.join(out_path, path.basename(f) + '.txt'), text, 'utf8')
 			result.push(text)
-			//await this.saveText(text, path.join(ROOT, file_id, p))
 		}
-		await fsp.writeFile(path.join(out_path, 'fulltext.txt'), result.join('\n'), 'utf8')
+		// create fulltext.txt
+		result = result.map((x , index) => '\n\n--- ' + index + ' ---\n\n' + x )
+		await fsp.writeFile(path.join(out_path, 'fulltext.txt'), result.join(''), 'utf8')
 		return 'done'
 	}
 
