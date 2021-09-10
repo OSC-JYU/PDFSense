@@ -1,5 +1,6 @@
 IMAGES := $(shell docker images -f "dangling=true" -q)
 CONTAINERS := $(shell docker ps -a -q -f status=exited)
+NAME := pdfsense
 VOLUME := pdf-data
 VERSION := 20.04
 
@@ -12,23 +13,18 @@ create_volume:
 	docker volume create $(VOLUME)
 
 build:
-	docker build -t osc.repo.kopla.jyu.fi/arihayri/ubuntu-node12-pdf:$(VERSION) .
-
-push:
-	docker push osc.repo.kopla.jyu.fi/arihayri/ubuntu-node12-pdf:$(VERSION)
-
-pull:
-	docker pull osc.repo.kopla.jyu.fi/arihayri/ubuntu-node12-pdf:$(VERSION)
+	docker build -t artturimatias/$(NAME):$(VERSION) .
 
 start:
-	docker run -d --name ubuntu-node12-pdf \
+	docker run -d --name $(NAME) \
+		-p 8200:8200 \
 		-v $(VOLUME):/logs \
-		--network-alias ubuntu-node12-pdf \
-		osc.repo.kopla.jyu.fi/arihayri/ubuntu-node12-pdf:$(VERSION)
+		--network-alias pdfsense \
+		artturimatias/$(NAME):$(VERSION)
 restart:
-	docker stop ubuntu-node12-pdf
-	docker rm ubuntu-node12-pdf
+	docker stop pdfsense
+	docker rm pdfsense
 	$(MAKE) start
 
 bash:
-	docker exec -it ubuntu-node12-pdf bash
+	docker exec -it pdfsense bash
