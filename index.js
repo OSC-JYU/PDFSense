@@ -123,13 +123,20 @@ router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
 
 // catch sharp commands
 router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
-	const result = await pdfsense.sharp(ctx.params.fileid, ctx.body, ctx.path, ctx.params.sharp_command)
+	const result = await pdfsense.sharp(ctx.params.fileid, ctx.request.body, ctx.path, ctx.params.sharp_command)
 	ctx.body = result
 });
 
 // catch tesseract commands
 router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async function (ctx, next) {
-	const result = await pdfsense.tesseract(ctx.params.fileid, ctx.body, ctx.path, ctx.params.tesseract_command)
+	const result = await pdfsense.tesseract(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+
+});
+
+// catch noteshrink commands
+router.post('/api/uploads/:fileid/(.*)/noteshrink/:noteshrink_command',async function (ctx, next) {
+	const result = await pdfsense.noteshrink(ctx.params.fileid, ctx.request.body, ctx.path, ctx.params.noteshrink_command)
 	ctx.body = result
 
 });

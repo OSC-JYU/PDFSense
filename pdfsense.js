@@ -39,23 +39,28 @@ class PDFSense {
 		const output_path = 'rendered/images'
 		const filepath = path.join(input_path, filename)
 		//await this.createDirs(file_id, output_path)
-		await fsp.mkdir(path.join(input_path, out_path), { recursive: true })
+		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFToPpm(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
 		var response = {files: files}
 		return response
 	}
 
-	async tesseract(file_id, options, url_path, output_type) {
-		const command_path = `/tesseract/${output_type}`
+	async tesseract(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/tesseract/${params.tesseract_command}`
 		console.log(command_path)
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
-		var files = await this.getFileList(input_path)
-
-		if(output_type === 'pdf') await this.tesseractToPDF(files, options, out_path)
-		else await this.tesseractToTextFile(files, {l:'fin'}, out_path)
+		var files = await this.getFileList(input_path, input_path)
+		//if(ctx.params.lang)
+		if(query.lang) {
+			options.lang = query.lang
+		}
+		console.log(`tesseract options: ${JSON.stringify(options, null, 2)}`)
+		if(params.tesseract_command === 'pdf') await this.tesseractToPDF(files, options, out_path)
+		else await this.tesseractToTextFile(files, options, out_path)
 	}
 
 	async sharp(file_id, options, url_path, command) {
@@ -63,10 +68,11 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
-		var files = await this.getFileList(input_path)
+		var files = await this.getFileList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
 		//const filelist = files.map(x => path.join(input_path, x))
 		for(const f of files) {
+			console.log(f)
 			await sharp(path.join(input_path, f)).rotate(90).toFile(path.join(out_path, f))
 
 		}
@@ -120,7 +126,9 @@ class PDFSense {
 	async PDFToPpm(filepath, outpath, options) {
 		if(!options) {
 			options = {
-				cropBox: true
+				cropBox: true,
+				pngFile: true,
+				resolutionXYAxis: 300
 			}
 		}
 		const poppler = new Poppler('/usr/bin/');
@@ -222,12 +230,12 @@ class PDFSense {
 		}
 	}
 
-	async getFileList(input_path) {
+	async getFileList(input_path, fullpath) {
 		var files = await fsp.readdir(input_path, { withFileTypes: true })
 		return files
 			.filter(dirent => dirent.isFile())
         	.map(dirent => dirent.name)
-			.map(x => path.join(input_path, x))
+			.map(x => path.join(fullpath, x))
 	}
 
 	createFileID(filename) {
@@ -237,11 +245,44 @@ class PDFSense {
 		return filename + '-' + t
 	}
 
+	async noteshrink() {
+		let pp = await koe(success, nosuccess)
+	}
 
 }
 
 function isEntryPoint() {
   return require.main === module;
+}
+
+function koe(success, nosuccess) {
+	return new Promise(function(success, nosuccess) {
+		console.log('pam********************************')
+		const { spawn } = require('child_process');
+		const pyprog = spawn('python', ['./../pypy.py']);
+
+		pyprog.stdout.on('data', function(data) {
+
+			success(data);
+		});
+
+		pyprog.stderr.on('data', function(data) {
+			console.log('sd')
+			console.log(data)
+			return success(data);
+			//nosuccess(data);
+		});
+	});
+}
+
+
+
+function success(data) {
+console.log('pommi')
+}
+
+function nosuccess(data) {
+	console.log('pammi')
 }
 
 module.exports = PDFSense;
