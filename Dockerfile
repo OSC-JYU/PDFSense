@@ -12,13 +12,13 @@ RUN apt-get install -y nodejs
 
 COPY package.json /src/package.json
 RUN cd /src; npm install
-
-COPY . /src
+RUN useradd -rm -d /home/node -s /bin/bash  -u 1000 node
+COPY --chown=node . /src 
 WORKDIR /src
 
 RUN cd /src/noteshrink; pip3 install -r requirements.txt -t .
 
 # ADD HERE OCR LANGUAGES THAT YOU NEED
 RUN apt-get install -y tesseract-ocr-fin tesseract-ocr-swe
-
+USER node
 CMD ["node", "index.js"]

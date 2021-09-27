@@ -22,6 +22,10 @@ start:
 		--mount type=bind,source="$(PWD)"/data,target=/src/data \
 		--network-alias pdfsense \
 		artturimatias/$(NAME):$(VERSION)
+
+stop:
+	docker stop pdfsense
+
 restart:
 	docker stop pdfsense
 	docker rm pdfsense
