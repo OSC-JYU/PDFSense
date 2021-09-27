@@ -63,23 +63,22 @@ class PDFSense {
 
 	async noteshrink(params, options, url_path, query) {
 		const file_id = params.fileid
-		const command_path = `/noteshrink/`
+		const command_path = `/noteshrink/${params.noteshrink_command}`
 		console.log(command_path)
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		console.log(input_path)
 		const out_path =  path.join(ROOT, file_id, p)
-		var files = await this.getFileList(input_path, input_path)
+		var filelist = await this.getFileList(input_path, input_path)
 		await fsp.mkdir(out_path, { recursive: true })
 		//const tesseract = require("node-tesseract-ocr")
 
 		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
 		const file = fs.createWriteStream(path.join(out_path, 'ocr.log'))
-		//options.presets = ["pdf"]
-		//const pdf = await tesseract.recognize(filelist, options)
-		//await fsp.writeFile(path.join(out_path, 'out.txt'), pdf, 'utf8')
 		var result = await this.noteshrink_spawn(filelist, options, out_path)
 		await fsp.writeFile(path.join(out_path, 'noteshrink.cli'), result.cli.join(' '), 'utf8')
 		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
+		return result
 	}
 
 	async sharp(params, options, url_path, query) {
@@ -171,9 +170,10 @@ class PDFSense {
 	noteshrink_spawn(filelist, options, out_path) {
 		const spawn = require("child_process").spawn
 		var result = {log: [], cli: '', exitcode: ''}
+		console.log(filelist)
 		//var id = this.getFilenameFromFileID()
 		 return new Promise((resolve, reject) => {
-			 var child = spawn('python3 noteshrink/noteshrink.py', [filelist]);
+			 var child = spawn('python3', ['noteshrink/noteshrink.py', '-b'+out_path+'/',filelist.join(' ')]);
 			 result.cli = child.spawnargs
 
 	 		child.stdout.on('data', function (data) {
@@ -325,6 +325,7 @@ class PDFSense {
 		return files
 			.filter(dirent => dirent.isFile())
         	.map(dirent => dirent.name)
+			.filter(f => ['.png','.jpg'].includes(path.extname(f)))
 			.map(x => path.join(fullpath, x))
 	}
 

@@ -575,7 +575,7 @@ def notescan_main(options):
         if not options.quiet:
             print('  done\n')
 
-    emit_pdf(outputs, options)
+    #emit_pdf(outputs, options)
 
 ######################################################################
 

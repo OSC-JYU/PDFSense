@@ -20,7 +20,7 @@ app.use(async function handleError(context, next) {
 			console.log('ERROR: ' + error.message);
 			context.body = {'error':error.message};
 		} else {
-			console.log('ERRORsdf: ' + error);
+			console.log('ERROR: ' + error);
 			context.body = {'error':error};
 		}
 		//debug(error.stack);
@@ -102,6 +102,7 @@ router.post('/api/uploads', async function (ctx) {
 	ctx.body = {
 		fileid: upload.file_id,
 		filepath: upload.path,
+		path: `:${server.address().port}/api/uploads/${upload.file_id}`,
 		name: file.name,
 		type: file.type,
 		size: file.size
@@ -145,12 +146,11 @@ router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx
 router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async function (ctx, next) {
 	const result = await pdfsense.tesseract(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
-
 });
 
 // catch noteshrink commands
 router.post('/api/uploads/:fileid/(.*)/noteshrink/:noteshrink_command',async function (ctx, next) {
-	const result = await pdfsense.noteshrink(ctx.params.fileid, ctx.request.body, ctx.path, ctx.params.noteshrink_command)
+	const result = await pdfsense.noteshrink(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 
 });
