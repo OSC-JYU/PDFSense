@@ -5,6 +5,9 @@ PDFSense combines several open source PDF, image and text tools to one REST API.
 
 PDFSense also **stores the output of every endpoint**. This allows you to upload original input once and then experiment with processing endpoint without the need to upload original data again and again.
 
+PDFSense bind mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see result of each action:
+
+![ideal setup](https://github.com/artturimatias/PDFSense/blob/master/images/setup.jpg)
 
 ## Install and run with Docker
 
