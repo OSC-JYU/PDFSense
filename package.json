@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/OSC-JYU/PDFsense#readme",
   "dependencies": {
+    "archiver": "^5.3.0",
     "axios": "^0.21.1",
     "koa": "^2.13.1",
     "koa-body": "^4.2.0",

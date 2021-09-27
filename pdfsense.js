@@ -38,7 +38,6 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'rendered/images'
 		const filepath = path.join(input_path, filename)
-		//await this.createDirs(file_id, output_path)
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFToPpm(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
@@ -54,7 +53,6 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
 		var files = await this.getFileList(input_path, input_path)
-		//if(ctx.params.lang)
 		if(query.lang) {
 			options.lang = query.lang
 		}
@@ -63,17 +61,42 @@ class PDFSense {
 		else await this.tesseractToTextFile(files, options, out_path)
 	}
 
-	async sharp(file_id, options, url_path, command) {
-		const command_path = `/sharp/${command}`
+	async noteshrink(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/noteshrink/`
+		console.log(command_path)
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		var files = await this.getFileList(input_path, input_path)
+		await fsp.mkdir(out_path, { recursive: true })
+		//const tesseract = require("node-tesseract-ocr")
+
+		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
+		const file = fs.createWriteStream(path.join(out_path, 'ocr.log'))
+		//options.presets = ["pdf"]
+		//const pdf = await tesseract.recognize(filelist, options)
+		//await fsp.writeFile(path.join(out_path, 'out.txt'), pdf, 'utf8')
+		var result = await this.noteshrink_spawn(filelist, options, out_path)
+		await fsp.writeFile(path.join(out_path, 'noteshrink.cli'), result.cli.join(' '), 'utf8')
+		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
+	}
+
+	async sharp(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/sharp/${params.sharp_command}`
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
 		var files = await this.getFileList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
-		//const filelist = files.map(x => path.join(input_path, x))
+		var angle = 90
+		if(query.angle) {
+			angle = parseInt(query.angle)
+		}
 		for(const f of files) {
 			console.log(f)
-			await sharp(path.join(input_path, f)).rotate(90).toFile(path.join(out_path, f))
+			await sharp(path.join(input_path, f)).rotate(angle).toFile(path.join(out_path, f))
 
 		}
 
@@ -97,16 +120,84 @@ class PDFSense {
 		return 'done'
 	}
 
-	async tesseractToPDF(filelist, options) {
-		const tesseract = require("node-tesseract-ocr")
+	async tesseractToPDF(filelist, options, out_path) {
+		await fsp.mkdir(out_path, { recursive: true })
+		//const tesseract = require("node-tesseract-ocr")
+
+		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
+		const file = fs.createWriteStream(path.join(out_path, 'ocr.log'))
+		//options.presets = ["pdf"]
+		//const pdf = await tesseract.recognize(filelist, options)
+		//await fsp.writeFile(path.join(out_path, 'out.txt'), pdf, 'utf8')
+		var result = await this.tesseract_spawn(filelist, options, out_path)
+		await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
+		await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join('\n'), 'utf8')
 
 		return 'done'
 	}
 
-	getFilenameFromFileID(file_id) {
-		return file_id.split('-')[0]
+	tesseract_spawn(filelist, options, out_path) {
+		const spawn = require("child_process").spawn
+		var result = {log: [], cli: '', exitcode: ''}
+		//var id = this.getFilenameFromFileID()
+		 return new Promise((resolve, reject) => {
+			 var child = spawn('tesseract', [path.join(out_path, 'files.txt'),path.join(out_path, 'ocr'),'pdf']);
+			 result.cli = child.spawnargs
+
+	 		child.stdout.on('data', function (data) {
+	 			console.log('stdout: ' + data);
+	 		});
+	 		child.stderr.on('data', function (data) {
+	 			console.log('stderr: ' + data);
+				result.log.push(data)
+	 		});
+	 		child.on('close', function (code) {
+	 			console.log('child process exited with code ' + code);
+				result.log.push(code)
+				result.exitcode = code
+				resolve(result)
+	 			//file.end();
+	 		});
+			child.on('error', function (code) {
+	 			console.log('child process errored with code ' + code);
+				result.exitcode = code
+				reject(result)
+	 			//file.end();
+	 		});
+		 })
 	}
 
+
+	noteshrink_spawn(filelist, options, out_path) {
+		const spawn = require("child_process").spawn
+		var result = {log: [], cli: '', exitcode: ''}
+		//var id = this.getFilenameFromFileID()
+		 return new Promise((resolve, reject) => {
+			 var child = spawn('python3 noteshrink/noteshrink.py', [filelist]);
+			 result.cli = child.spawnargs
+
+	 		child.stdout.on('data', function (data) {
+	 			console.log('stdout: ' + data);
+	 		});
+	 		child.stderr.on('data', function (data) {
+	 			console.log('stderr: ' + data);
+				result.log.push(data)
+	 		});
+	 		child.on('close', function (code) {
+	 			console.log('child process exited with code ' + code);
+				result.log.push(code)
+				result.exitcode = code
+				resolve(result)
+	 			//file.end();
+	 		});
+			child.on('error', function (code) {
+	 			console.log('child process errored with code ' + code);
+				result.exitcode = code
+				reject(result)
+	 			//file.end();
+	 		});
+		 })
+	}
 
 	async PDFImages(filepath, outpath, options) {
 
@@ -137,6 +228,55 @@ class PDFSense {
 	}
 
 
+	async getArchive(file_id, ctx) {
+		var filename = this.getFilenameFromFileID(file_id)
+		const input_path = path.join(ROOT, file_id)
+		console.log(path.join(input_path, `${filename}.zip`))
+		const src = fs.createReadStream(path.join(input_path, `${filename}.zip`));
+		ctx.attachment(`${filename}.zip`)
+        ctx.response.set("content-type", "application/octet-stream");
+        ctx.response.body = src;
+		src.pipe(ctx.res);
+
+		var end = new Promise(function(resolve, reject) {
+		    src.on('close', () => { console.log('finish'); resolve()});
+		    src.on('error', reject);
+		});
+
+		return end
+
+	}
+
+	async createArchive(file_id, ctx) {
+		const archiver = require('archiver');
+		var filename = this.getFilenameFromFileID(file_id)
+		const input_path = path.join(ROOT, file_id)
+		const output = fs.createWriteStream(path.join(input_path, filename + '.zip'), {flags:'w'});
+		const archive = archiver('zip', {
+		  zlib: { level: 0 } // Do not compress, images compresses badly.
+		});
+		archive.pipe(output);
+		var end = new Promise(function(resolve, reject) {
+			output.on('finish', async () => {
+				console.log('done')
+				resolve({file: filename + '.zip', fetch:`/api/uploads/${file_id}/zip`});
+			})
+			output.on('close', async () => {
+				console.log('done')
+				resolve('close');
+			})
+			output.on('error', reject);
+			archive.on('error', reject);
+		});
+
+		archive.file(path.join(input_path, filename), {name: filename})
+		archive.directory(path.join(input_path, 'extracted'), 'extracted');
+		archive.directory(path.join(input_path, 'rendered'), 'rendered');
+		archive.finalize()
+
+		return end;
+	}
+
 	async initialUpload(file) {
 		var sanitize = require("sanitize-filename");
 
@@ -152,36 +292,6 @@ class PDFSense {
 		//await fsp.unlink(file.path)
 	}
 
-	async saveFile(ctx) {
-		var fs = require('fs');
-		var fsp = require('fs').promises;
-
-		const file_id = uuid()
-		//console.log(ctx.request.files)
-		const file = ctx.request.files.file;
-
-		const reader = fs.createReadStream(file.path);
-		const stream = fs.createWriteStream(path.join('tmp', file_id));
-		reader.pipe(stream);
-		console.log('uploading %s -> %s', file.name, stream.path);
-
-		reader.on('error', function(e){
-			console.log(e.message);
-		})
-
-		// promise
-		var end = new Promise(function(resolve, reject) {
-			stream.on('finish', async () => {
-				//console.log(file)
-
-				resolve();
-			})
-			stream.on('error', reject);
-		});
-
-
-		return end;
-	}
 
 	async downloadFile(fileUrl) {
 		const file_id = uuid()
@@ -206,28 +316,8 @@ class PDFSense {
 
 	}
 
-	async createDirs(file_id, dpath) {
-		// just in case
-		if(ROOT.startsWith('/')) throw(new Error('Check your ROOT constant!'))
-
-		let [dir, subdir] = dpath.split('/')
-		try {
-			await fsp.mkdir(path.join(ROOT, file_id, dir))
-		} catch(e) {
-			console.log(`${dir } exists`)
-		}
-
-		try {
-			await fsp.mkdir(path.join(ROOT, file_id, dir, subdir))
-		} catch(e) {
-			try {
-				await fsp.rmdir(path.join(ROOT, file_id, dir, subdir), { recursive: true, force: true })
-				await fsp.mkdir(path.join(ROOT, file_id, dir, subdir))
-			} catch(e) {
-				console.log(e)
-				throw(new Error(`Directory creation failed: ${ROOT}/${file_id}/${dir}/${subdir}`))
-			}
-		}
+	getFilenameFromFileID(file_id) {
+		return file_id.split('-')[0]
 	}
 
 	async getFileList(input_path, fullpath) {
@@ -238,6 +328,13 @@ class PDFSense {
 			.map(x => path.join(fullpath, x))
 	}
 
+	async getDirList(input_path) {
+		var files = await fsp.readdir(path.join(ROOT, input_path), { withFileTypes: true })
+		return files
+			.filter(dirent => !dirent.isFile())
+        	.map(dirent => dirent.name)
+	}
+
 	createFileID(filename) {
 		function pad2(n) { return n < 10 ? '0' + n : n }
 		var date = new Date();
@@ -245,9 +342,6 @@ class PDFSense {
 		return filename + '-' + t
 	}
 
-	async noteshrink() {
-		let pp = await koe(success, nosuccess)
-	}
 
 }
 
@@ -255,88 +349,4 @@ function isEntryPoint() {
   return require.main === module;
 }
 
-function koe(success, nosuccess) {
-	return new Promise(function(success, nosuccess) {
-		console.log('pam********************************')
-		const { spawn } = require('child_process');
-		const pyprog = spawn('python', ['./../pypy.py']);
-
-		pyprog.stdout.on('data', function(data) {
-
-			success(data);
-		});
-
-		pyprog.stderr.on('data', function(data) {
-			console.log('sd')
-			console.log(data)
-			return success(data);
-			//nosuccess(data);
-		});
-	});
-}
-
-
-
-function success(data) {
-console.log('pommi')
-}
-
-function nosuccess(data) {
-	console.log('pammi')
-}
-
 module.exports = PDFSense;
-
-async function main() {
-
-	console.log('is entrypoint')
-	const pdfsense = new PDFSense()
-	//var pdf = await pdfsense.downloadFile('https://jyx.jyu.fi/bitstream/handle/123456789/40157/978-951-39-4908-2.pdf?sequence=1&isAllowed=y', 'filu.pdf')
-	var pdf = await pdfsense.downloadFile('http://www.africau.edu/images/default/sample.pdf', 'filu.pdf')
-	console.log(pdf)
-	var file = path.join('tmp', pdf.file_id)
-
-	// TODO: find out why node poppler did not work!
-	//const file = "test_document.pdf";
-	// const poppler = new Poppler('/usr/bin/');
-	// const options = {
-	// 	firstPageToConvert: 1,
-	// 	lastPageToConvert: 1,
-	// 	pngFile: true,
-	// };
-	// const outputFile = 'test_document.png';
-
-	//const res = await poppler.pdfToCairo(file, null, options);
-
-	const exec = require('child_process').exec;
-
-	var args = []
-/*
-	const child = exec('/usr/bin/pdftocairo -f 1 -l 1 -png ' + file, (error, stdout, stderr) => {
-    	if (error) {
-        	console.error('stderr', stderr);
-        	throw error;
-    	}
-    	console.log('stdout', stdout);
-	});
-
-	const child2 = exec('/usr/bin/pdftoppm -r 300 -cropbox tmp/2000.pdf tmp/page', (error, stdout, stderr) => {
-    	if (error) {
-        	console.error('stderr', stderr);
-        	throw error;
-    	}
-    	console.log('stdout', stdout);
-	});
-*/
-	const poppler = new Poppler('/usr/bin/');
-	const options = {
-		cropBox: true,
-		resolutionXYAxis:300
-	}
-	var res = await poppler.pdfToPpm('tmp/2000.pdf', 'tmp/page', options);
-	console.log(res)
-}
-
-if(isEntryPoint) {
-//main()
-}

@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y curl poppler-utils graphicsmagick imagemagick poppler-data vim tesseract-ocr
+RUN apt-get update && apt-get install -y curl poppler-utils graphicsmagick imagemagick poppler-data vim tesseract-ocr python3-pip
 
 # Install Node.js
 RUN apt-get install --yes curl
@@ -15,6 +15,8 @@ RUN cd /src; npm install
 
 COPY . /src
 WORKDIR /src
+
+RUN cd /src/noteshrink; pip3 install -r requirements.txt -t .
 
 # ADD HERE OCR LANGUAGES THAT YOU NEED
 RUN apt-get install -y tesseract-ocr-fin tesseract-ocr-swe

@@ -43,7 +43,7 @@ app.use(json({ pretty: true, param: 'pretty' }))
 require('winston-daily-rotate-file');
 
 var rotatedLog = new (winston.transports.DailyRotateFile)({
-	filename: 'logs/pdfsense-%DATE%.log',
+	filename: './logs/pdfsense-%DATE%.log',
 	datePattern: 'YYYY-MM',
 	zippedArchive: false,
 	maxSize: '20m'
@@ -89,6 +89,11 @@ router.get('/api', async function (ctx) {
 	ctx.body = 'PDFSense here';
 });
 
+router.get('/api/uploads', async function (ctx) {
+	const uploads = await pdfsense.getDirList('')
+	ctx.body = uploads
+});
+
 router.post('/api/uploads', async function (ctx) {
 	const file = ctx.request.files.file;
 	//console.log(file)
@@ -120,6 +125,15 @@ router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
 	ctx.body = {}
 })
 
+router.get('/api/uploads/:fileid/zip', async function (ctx) {
+	ctx.body = await pdfsense.getArchive(ctx.params.fileid, ctx)
+	//ctx.body = uploads
+});
+
+router.post('/api/uploads/:fileid/zip', async function (ctx) {
+	const uploads = await pdfsense.createArchive(ctx.params.fileid, ctx)
+	ctx.body = uploads
+});
 
 // catch sharp commands
 router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
