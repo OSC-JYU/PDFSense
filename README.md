@@ -11,7 +11,7 @@ PDFSense also **stores the output of every endpoint**. This allows you to upload
 Get source, build image and start
 
 	git clone https://github.com/artturimatias/PDFSense
-	cd PDFsense
+	cd PDFSense
 	make build
 	make start
 
