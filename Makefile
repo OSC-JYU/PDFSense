@@ -1,7 +1,6 @@
 IMAGES := $(shell docker images -f "dangling=true" -q)
 CONTAINERS := $(shell docker ps -a -q -f status=exited)
 NAME := pdfsense
-VOLUME := pdf-data
 VERSION := 20.04
 
 
@@ -18,8 +17,8 @@ build:
 start:
 	docker run -d --name $(NAME) \
 		-p 8200:8200 \
-		-v $(VOLUME):/logs \
 		--mount type=bind,source="$(PWD)"/data,target=/src/data \
+		--mount type=bind,source="$(PWD)"/logs,target=/src/logs \
 		--network-alias pdfsense \
 		artturimatias/$(NAME):$(VERSION)
 
