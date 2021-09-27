@@ -12,7 +12,7 @@ const { Poppler } 	= require("node-poppler");
 
 const finished = util.promisify(stream.finished);
 
-const ROOT = 'tmp'
+const ROOT = 'data'
 
 class PDFSense {
 
@@ -284,8 +284,8 @@ class PDFSense {
 		//const file_id = uuid()
 		const file_id = this.createFileID(filename_clean)
 		console.log(file_id)
-		await fsp.mkdir(path.join('tmp', file_id))
-		const target_path = path.join('tmp', file_id, filename_clean)
+		await fsp.mkdir(path.join(ROOT, file_id))
+		const target_path = path.join(ROOT, file_id, filename_clean)
 
 		await fsp.rename(file.path, target_path)
 		return {file_id: file_id, path: target_path}
@@ -295,7 +295,7 @@ class PDFSense {
 
 	async downloadFile(fileUrl) {
 		const file_id = uuid()
-		const writer = fs.createWriteStream(path.join('tmp', file_id));
+		const writer = fs.createWriteStream(path.join(ROOT, file_id));
 		return new Promise(function(resolve, reject) {
 			axios({
 				method: 'get',

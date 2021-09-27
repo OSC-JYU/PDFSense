@@ -19,7 +19,7 @@ start:
 	docker run -d --name $(NAME) \
 		-p 8200:8200 \
 		-v $(VOLUME):/logs \
-		--mount type=bind,source="$(PWD)"/tmp,target=/src/tmp \
+		--mount type=bind,source="$(PWD)"/data,target=/src/data \
 		--network-alias pdfsense \
 		artturimatias/$(NAME):$(VERSION)
 restart:

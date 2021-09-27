@@ -30,7 +30,7 @@ app.use(async function handleError(context, next) {
 
 //Set up body parsing middleware
 app.use(bodyParser({
-   formidable:{uploadDir: './tmp', maxFileSize: 20000 * 1024 * 1024},
+   formidable:{uploadDir: './data', maxFileSize: 20000 * 1024 * 1024},
    multipart: true,
    urlencoded: true
 }));
