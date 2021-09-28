@@ -82,6 +82,23 @@ Extracts text (pdf2text) or images (pdfimages) from PDF
 ### rendered/images
 Renders images from PDF
 
+### sharp/rotated
+Rotate images
+
+### noteshrink/images
+Apply noteshrink to images
+
+### tesseract/[text|pdf]
+Do OCR and output PDF or text
+
+
+## Shoulders
+https://github.com/tesseract-ocr
+https://github.com/lovell/sharp
+https://github.com/mzucker/noteshrink
+https://pypi.org/project/poppler-utils/
+https://github.com/mzsanford/cld
+
 ## FAQ
 
 ### Result of OCR is totally gibberish
