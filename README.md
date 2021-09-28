@@ -5,7 +5,7 @@ PDFSense combines several open source PDF, image and text tools to one REST API.
 
 PDFSense also **stores the output of every endpoint**. This allows you to upload original input once and then experiment with processing endpoint without the need to upload original data again and again.
 
-PDFSense bind mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see result of each action:
+PDFSense bind mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see the result of each action immediately in your file browser:
 
 ![ideal setup](https://github.com/artturimatias/PDFSense/blob/master/images/setup.jpg)
 
@@ -81,6 +81,27 @@ Extracts text (pdf2text) or images (pdfimages) from PDF
 
 ### rendered/images
 Renders images from PDF
+
+### sharp/rotated
+Rotate images
+
+### noteshrink/images
+Apply noteshrink to images
+
+### tesseract/[text|pdf]
+Do OCR and output PDF or text
+
+
+## Shoulders
+https://github.com/tesseract-ocr
+
+https://github.com/lovell/sharp
+
+https://github.com/mzucker/noteshrink
+
+https://pypi.org/project/poppler-utils/
+
+https://github.com/mzsanford/cld
 
 ## FAQ
 
