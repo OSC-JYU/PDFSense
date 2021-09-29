@@ -1,11 +1,41 @@
 # PDFSense [WORK IN PROGRESS]
-Simple backend for language detection, text extraction, image extraction and OCR for PDF files
+A Simple and stateful backend for language detection, text extraction, image extraction, noteshrinking, and OCR of PDF files
 
 PDFSense combines several open source PDF, image and text tools to one REST API. It tries to use sensible defaults, so that you could get good results without tinkering with the settings.
 
-PDFSense also **stores the output of every endpoint**. This allows you to upload original input once and then experiment with processing endpoint without the need to upload original data again and again.
+PDFSense **stores the output of every endpoint** as a directory tree (thats' why it is stateful). This allows you to upload original input once and then experiment with processing endpoints without the need to upload original data again and again.
 
-PDFSense bind mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see the result of each action immediately in your file browser:
+	.
+	├── extracted
+	│   └── images
+	│       ├── page-000.jpg
+	│       └── tesseract
+	│           └── pdf
+	│               ├── files.txt
+	│               ├── ocr.cli
+	│               ├── ocr.log
+	│               └── ocr.pdf
+	├── rendered
+	│   └── images
+	│       ├── noteshrink
+	│       │   └── images
+	│       │       ├── files.txt
+	│       │       ├── noteshrink.cli
+	│       │       ├── noteshrink.log
+	│       │       ├── page-1.png
+	│       │       └── tesseract
+	│       │           └── pdf
+	│       │               ├── files.txt
+	│       │               ├── ocr.cli
+	│       │               ├── ocr.log
+	│       │               └── ocr.pdf
+	│       └── page-1.png
+	└── typewritten_bw_aamunkoitto.pdf
+
+
+
+
+PDFSense mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see the result of each action immediately in your file browser:
 
 ![ideal setup](https://github.com/artturimatias/PDFSense/blob/master/images/setup.jpg)
 
@@ -76,21 +106,26 @@ After then we can try run OCR again for rotated images.
 
 ## Endpoints
 
-### extracted/[images|text]
+### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
 Extracts text (pdf2text) or images (pdfimages) from PDF
 
-### rendered/images
+### POST api/uploads/[UPLOAD_ID]/rendered/images
 Renders images from PDF
 
-### sharp/rotated
-Rotate images
+### POST ../sharp/rotated?angle=ANGLE
+Rotate images. Add to extracted or rendered images path.
 
-### noteshrink/images
-Apply noteshrink to images
+### POST ../noteshrink/images
+Apply noteshrink to images (excellent for improving bad b/w scans)
 
-### tesseract/[text|pdf]
+### POST ../tesseract/[text|pdf]?language=LANG_CODE
 Do OCR and output PDF or text
 
+### POST api/uploads/[UPLOAD_ID]/zip
+Create a zip archive with all files and directories produced by PDFSense
+
+### GET api/uploads/[UPLOAD_ID]/zip
+Fetch all files and directories as zip archive
 
 ## Shoulders
 https://github.com/tesseract-ocr
@@ -102,6 +137,8 @@ https://github.com/mzucker/noteshrink
 https://pypi.org/project/poppler-utils/
 
 https://github.com/mzsanford/cld
+
+If you are looking for
 
 ## FAQ
 
