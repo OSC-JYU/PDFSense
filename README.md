@@ -101,7 +101,7 @@ We just remove the previous command from path (tesseract/text) and apply sharp c
 
 After then we can try run OCR again for rotated images.
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate/tesseract/text?language=fin
+        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate/tesseract/text?lang=fin
 
 
 ## Endpoints
@@ -120,9 +120,9 @@ Rotate images. Add to extracted or rendered images path.
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)
 
-### POST ../tesseract/[text|pdf|textpdf]?language=LANG_CODE
+### POST ../tesseract/[text|pdf|textpdf]?lang=LANG_CODE
 Do OCR and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
-Note the language query parameter! **Make sure you have installed tesseract language package for your language** (see Dockerfile)
+Note the language query parameter! Default language is 'eng'. **Make sure you have installed tesseract language package for your language** (see Dockerfile, eng, fin and swe are installed by default)
 
 ### POST ../pdf
 Generate PDF from images. For example:
