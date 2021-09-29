@@ -75,7 +75,7 @@ router.param('sharp_command', (output, ctx, next) => {
 
 router.param('tesseract_command', (output, ctx, next) => {
 	console.log('tesseract command found!')
-	if (!['pdf','text'].includes(output)) throw(new Error('Tesseract path must end with /pdf or /text'))
+	if (!['pdf','text','textpdf'].includes(output)) throw(new Error('Tesseract path must end with /pdf or /text or /textpdf'))
 	return next();
 })
 
@@ -114,15 +114,15 @@ router.post('/api/uploads/:fileid/extracted/images', async function (ctx) {
 	ctx.body = result
 })
 
-router.post('/api/uploads/:fileid/rendered/images', async function (ctx) {
-	const result = await pdfsense.renderImagesFromPDF(ctx.params.fileid, ctx.body)
+router.post('/api/uploads/:fileid/rendered/:resolution', async function (ctx) {
+	const result = await pdfsense.renderImagesFromPDF(ctx.params, ctx.request.body, ctx.query)
 	ctx.body = result
 })
 
 
 
 router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
-	console.log(ctx.params.fileid)
+	const result = await pdfsense.extractTextFromPDF(ctx.params.fileid, ctx.body)
 	ctx.body = {}
 })
 
@@ -152,8 +152,20 @@ router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async funct
 router.post('/api/uploads/:fileid/(.*)/noteshrink/:noteshrink_command',async function (ctx, next) {
 	const result = await pdfsense.noteshrink(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
-
 });
+
+// catch pdf combine command
+router.post('/api/uploads/:fileid/(.*)/pdf/combined',async function (ctx, next) {
+	const result = await pdfsense.combinePDFs(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+});
+
+// catch pdf generation command
+router.post('/api/uploads/:fileid/(.*)/pdf',async function (ctx, next) {
+	const result = await pdfsense.images2PDF(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+});
+
 
 router.delete('/api/uploads/:fileid', async function (ctx) {
 	ctx.body = 'PDFSense here';

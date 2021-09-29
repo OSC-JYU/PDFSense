@@ -33,52 +33,32 @@ class PDFSense {
 		return response
 	}
 
-	async renderImagesFromPDF(file_id, options) {
+	async extractTextFromPDF(file_id, options) {
 		var filename = this.getFilenameFromFileID(file_id)
 		const input_path = path.join(ROOT, file_id)
-		const output_path = 'rendered/images'
+		const output_path = 'extracted/text'
 		const filepath = path.join(input_path, filename)
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
-		await this.PDFToPpm(filepath, path.join(input_path, output_path))
+		await this.PDFToText(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
 		var response = {files: files}
 		return response
 	}
 
-	async tesseract(params, options, url_path, query) {
-		const file_id = params.fileid
-		const command_path = `/tesseract/${params.tesseract_command}`
-		console.log(command_path)
-		var p = url_path.split(file_id)[1]
-		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
-		const out_path =  path.join(ROOT, file_id, p)
-		var files = await this.getFileList(input_path, input_path)
-		if(query.lang) {
-			options.lang = query.lang
-		}
-		console.log(`tesseract options: ${JSON.stringify(options, null, 2)}`)
-		if(params.tesseract_command === 'pdf') await this.tesseractToPDF(files, options, out_path)
-		else await this.tesseractToTextFile(files, options, out_path)
-	}
+	async renderImagesFromPDF(params, options, query) {
+		if(!params.resolution || !parseInt(params.resolution)) throw('Invalid render resolution (must be integer)')
+		options.resolutionXYAxis = parseInt(params.resolution)
 
-	async noteshrink(params, options, url_path, query) {
-		const file_id = params.fileid
-		const command_path = `/noteshrink/${params.noteshrink_command}`
-		console.log(command_path)
-		var p = url_path.split(file_id)[1]
-		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
-		console.log(input_path)
-		const out_path =  path.join(ROOT, file_id, p)
-		var filelist = await this.getFileList(input_path, input_path)
-		await fsp.mkdir(out_path, { recursive: true })
-		//const tesseract = require("node-tesseract-ocr")
+		var filename = this.getFilenameFromFileID(params.fileid)
+		const input_path = path.join(ROOT, params.fileid)
+		const output_path = 'rendered/' + options.resolutionXYAxis
+		const filepath = path.join(input_path, filename)
+		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 
-		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
-		const file = fs.createWriteStream(path.join(out_path, 'ocr.log'))
-		var result = await this.noteshrink_spawn(filelist, options, out_path)
-		await fsp.writeFile(path.join(out_path, 'noteshrink.cli'), result.cli.join(' '), 'utf8')
-		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
-		return result
+		await this.PDFToPpm(filepath, path.join(input_path, output_path), options)
+		var files = await fsp.readdir(path.join(input_path, output_path))
+		var response = {files: files}
+		return response
 	}
 
 	async sharp(params, options, url_path, query) {
@@ -101,6 +81,29 @@ class PDFSense {
 
 	}
 
+	async tesseract(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/tesseract/${params.tesseract_command}`
+		console.log(command_path)
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		var files = await this.getFileList(input_path, input_path)
+		if(query.lang) {
+			options.lang = query.lang
+		}
+		console.log(`tesseract options: ${JSON.stringify(options, null, 2)}`)
+		if(params.tesseract_command === 'pdf') {
+			 await this.tesseractToPDF(files, options, out_path)
+		} else if(params.tesseract_command === 'textpdf') {
+			if(!options.c) options.c = {}
+			options.c['textonly_pdf'] = 1
+			await this.tesseractToPDF(files, options, out_path)
+		} else {
+			await this.tesseractToTextFile(files, options, out_path)
+		}
+	}
+
 	async tesseractToTextFile(filelist, options, out_path) {
 		await fsp.mkdir(out_path, { recursive: true })
 		const tesseract = require("node-tesseract-ocr")
@@ -121,13 +124,7 @@ class PDFSense {
 
 	async tesseractToPDF(filelist, options, out_path) {
 		await fsp.mkdir(out_path, { recursive: true })
-		//const tesseract = require("node-tesseract-ocr")
-
 		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
-		const file = fs.createWriteStream(path.join(out_path, 'ocr.log'))
-		//options.presets = ["pdf"]
-		//const pdf = await tesseract.recognize(filelist, options)
-		//await fsp.writeFile(path.join(out_path, 'out.txt'), pdf, 'utf8')
 		var result = await this.tesseract_spawn(filelist, options, out_path)
 		await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
 		await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join('\n'), 'utf8')
@@ -137,15 +134,28 @@ class PDFSense {
 
 	tesseract_spawn(filelist, options, out_path) {
 		const spawn = require("child_process").spawn
+		var args = []
+		if(options.c) {
+			for(var parameter in options.c) {
+				args.push('-c')
+				args.push(`${parameter}=${options.c[parameter]}`)
+			}
+		}
+		args.push(path.join(out_path, 'files.txt'))
+		args.push(path.join(out_path, 'ocr'))
+		args.push('pdf')
 		var result = {log: [], cli: '', exitcode: ''}
 		//var id = this.getFilenameFromFileID()
 		 return new Promise((resolve, reject) => {
-			 var child = spawn('tesseract', [path.join(out_path, 'files.txt'),path.join(out_path, 'ocr'),'pdf']);
+			 var child = spawn('tesseract', args);
+			 console.log(child.spawnargs)
 			 result.cli = child.spawnargs
 
+			child.stdout.setEncoding('utf8');
 	 		child.stdout.on('data', function (data) {
 	 			console.log('stdout: ' + data);
 	 		});
+			child.stderr.setEncoding('utf8');
 	 		child.stderr.on('data', function (data) {
 	 			console.log('stderr: ' + data);
 				result.log.push(data)
@@ -167,18 +177,170 @@ class PDFSense {
 	}
 
 
-	noteshrink_spawn(filelist, options, out_path) {
+	async noteshrink(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/noteshrink/${params.noteshrink_command}`
+		console.log(command_path)
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		console.log(input_path)
+		const out_path =  path.join(ROOT, file_id, p)
+		await fsp.mkdir(out_path, { recursive: true })
+		var filelist = await this.getFileList(input_path, input_path)
+		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
+		var result = {log: [], cli: []}
+
+		for(const file of filelist) {
+			try {
+				var out = await this.noteshrink_spawn(file, options, out_path)
+				result.cli.push(out.cli)
+				result.log.push(out.log)
+			} catch(e) {
+				console.log(`Problem with file ${file} \n ${e}`)
+			}
+		}
+
+		await fsp.writeFile(path.join(out_path, 'noteshrink.cli'), result.cli.join('\n'), 'utf8')
+		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
+		return result
+	}
+
+	noteshrink_spawn(file, options, out_path) {
 		const spawn = require("child_process").spawn
 		var result = {log: [], cli: '', exitcode: ''}
-		console.log(filelist)
-		//var id = this.getFilenameFromFileID()
-		 return new Promise((resolve, reject) => {
-			 var child = spawn('python3', ['noteshrink/noteshrink.py', '-b'+out_path+'/',filelist.join(' ')]);
-			 result.cli = child.spawnargs
+		var outfile = path.basename(file).split('.').slice(0, -1).join('.')
 
+		 return new Promise((resolve, reject) => {
+			var child = spawn('python3', ['noteshrink/noteshrink.py', '-b'+out_path+'/'+outfile, file]);
+			console.log(child.spawnargs)
+			result.cli = child.spawnargs.join(' ')
+
+			child.stdout.setEncoding('utf8');
 	 		child.stdout.on('data', function (data) {
 	 			console.log('stdout: ' + data);
+				result.log.push(data)
 	 		});
+			child.stderr.setEncoding('utf8');
+	 		child.stderr.on('data', function (data) {
+	 			console.log('stderr: ' + data);
+				result.log.push(data)
+	 		});
+	 		child.on('close', function (code) {
+	 			console.log('child process exited with code ' + code);
+				result.log.push(code)
+				result.exitcode = code
+				resolve(result)
+	 			//file.end();
+	 		});
+			child.on('error', function (code) {
+	 			console.log('child process errored with code ' + code);
+				result.exitcode = code
+				reject(result)
+	 			//file.end();
+	 		});
+		 })
+	}
+
+	async combinePDFs(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/combined`
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		await fsp.mkdir(out_path, { recursive: true })
+		//var dirs = await this.getDirList('./')
+		//console.log(dirs)
+		// find out where textonly PDF is (ocr.pdf)
+		var dirs = []
+		for await (const f of this.getTextPdfDirs('./')) {
+  			console.log(f);
+			dirs.push(f)
+		}
+		console.log(dirs)
+		var result = {}
+		if(dirs.length > 0) {
+			result = await this.qpdf_spawn(input_path, path.join(ROOT,dirs[dirs.length-1]), out_path)
+			result.used_textonlypdf = dirs[dirs.length-1]
+			if(dirs.length > 1) {
+				result.textonlypdf_dirs = dirs
+				//result.hint = "You can select textonlypdf by parameter 'textonly=[ARRAY INDEX]'"
+			}
+		}
+		await fsp.writeFile(path.join(out_path, 'qpdf.cli'), result.cli, 'utf8')
+		await fsp.writeFile(path.join(out_path, 'qpdf.log'), result.log.join('\n'), 'utf8')
+		return result
+
+	}
+
+	async qpdf_spawn(input_path, ocr_path, out_path) {
+		var ocr = 'data/typewritten_bw_aamunkoitto.pdf-2021_09_29_070445/extracted/images/tesseract/textpdf/ocr.pdf'
+		const spawn = require("child_process").spawn
+		var result = {log: [], cli: '', exitcode: ''}
+		//var outfile = path.basename(file).split('.').slice(0, -1).join('.')
+
+		 return new Promise((resolve, reject) => {
+			var child = spawn('qpdf', ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',ocr_path + '/ocr.pdf','--',out_path + '/full.pdf']);
+			console.log(child.spawnargs)
+			result.cli = child.spawnargs.join(' ')
+
+			child.stdout.setEncoding('utf8');
+	 		child.stdout.on('data', function (data) {
+	 			console.log('stdout: ' + data);
+				result.log.push(data)
+	 		});
+			child.stderr.setEncoding('utf8');
+	 		child.stderr.on('data', function (data) {
+	 			console.log('stderr: ' + data);
+				result.log.push(data)
+	 		});
+	 		child.on('close', function (code) {
+	 			console.log('child process exited with code ' + code);
+				result.log.push(code)
+				result.exitcode = code
+				resolve(result)
+	 			//file.end();
+	 		});
+			child.on('error', function (code) {
+	 			console.log('child process errored with code ' + code);
+				result.exitcode = code
+				reject(result)
+	 			//file.end();
+	 		});
+		 })
+	}
+
+	async images2PDF(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/pdf`
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		console.log(input_path)
+		const out_path =  path.join(ROOT, file_id, p)
+		await fsp.mkdir(out_path, { recursive: true })
+		var filelist = await this.getFileList(input_path, input_path)
+		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
+		var result = await this.convert_spawn(filelist.join(' '), options, out_path)
+		await fsp.writeFile(path.join(out_path, 'convert.cli'), result.cli, 'utf8')
+		await fsp.writeFile(path.join(out_path, 'convert.log'), result.log.join('\n'), 'utf8')
+		return result
+	}
+
+	convert_spawn(filelist, options, out_path) {
+		const spawn = require("child_process").spawn
+		var result = {log: [], cli: '', exitcode: ''}
+		//var outfile = path.basename(file).split('.').slice(0, -1).join('.')
+
+		 return new Promise((resolve, reject) => {
+			var child = spawn('convert', [filelist, out_path + '/images.pdf']);
+			console.log(child.spawnargs)
+			result.cli = child.spawnargs.join(' ')
+
+			child.stdout.setEncoding('utf8');
+	 		child.stdout.on('data', function (data) {
+	 			console.log('stdout: ' + data);
+				result.log.push(data)
+	 		});
+			child.stderr.setEncoding('utf8');
 	 		child.stderr.on('data', function (data) {
 	 			console.log('stderr: ' + data);
 				result.log.push(data)
@@ -215,18 +377,22 @@ class PDFSense {
 	}
 
 	async PDFToPpm(filepath, outpath, options) {
-		if(!options) {
-			options = {
-				cropBox: true,
-				pngFile: true,
-				resolutionXYAxis: 300
-			}
-		}
+		options.pngFile = true // we always use png
+		if(!options.cropBox) options.cropBox = true
 		const poppler = new Poppler('/usr/bin/');
 		await poppler.pdfToPpm(filepath, outpath + '/page', options);
 
 	}
 
+	async PDFToText(filepath, outpath, options) {
+		if(!options) {
+			options = {
+			}
+		}
+		const poppler = new Poppler('/usr/bin/');
+		await poppler.pdfToText(filepath, outpath + '/text.txt', options);
+
+	}
 
 	async getArchive(file_id, ctx) {
 		var filename = this.getFilenameFromFileID(file_id)
@@ -336,10 +502,23 @@ class PDFSense {
         	.map(dirent => dirent.name)
 	}
 
+	async * getTextPdfDirs(dir) {
+		const dirents = await fsp.readdir(path.join(ROOT, dir), { withFileTypes: true });
+		for (const dirent of dirents) {
+			//console.log(dir)
+			//console.log(dirent.name)
+			const res = path.join(dir, dirent.name);
+			if (dirent.isDirectory()) {
+				if(res.includes('tesseract/textpdf')) yield res;
+				else yield* this.getTextPdfDirs(res);
+			}
+		}
+	}
+
 	createFileID(filename) {
 		function pad2(n) { return n < 10 ? '0' + n : n }
 		var date = new Date();
-		var t = date.getFullYear().toString() +'.'+ pad2(date.getMonth() + 1) +'.'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) +':'+ pad2( date.getMinutes() ) +':'+ pad2( date.getSeconds() )
+		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) + pad2( date.getMinutes() ) + pad2( date.getSeconds() )
 		return filename + '-' + t
 	}
 

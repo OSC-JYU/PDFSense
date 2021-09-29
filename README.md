@@ -1,41 +1,41 @@
 # PDFSense [WORK IN PROGRESS]
-A Simple and stateful backend for language detection, text extraction, image extraction, noteshrinking, and OCR of PDF files
+A Simple and stateful backend for text extraction, image extraction, noteshrinking, and OCR of PDF files
 
 PDFSense combines several open source PDF, image and text tools to one REST API. It tries to use sensible defaults, so that you could get good results without tinkering with the settings.
 
-PDFSense **stores the output of every endpoint** as a directory tree (thats' why it is stateful). This allows you to upload original input once and then experiment with processing endpoints without the need to upload original data again and again.
+PDFSense **stores the output of every endpoint** as a directory tree (thats' why it's stateful). This allows you to upload original PDF once and then experiment with processing endpoints without the need to upload original data again and again.
 
 	.
 	├── extracted
-	│   └── images
-	│       ├── page-000.jpg
-	│       └── tesseract
-	│           └── pdf
-	│               ├── files.txt
-	│               ├── ocr.cli
-	│               ├── ocr.log
-	│               └── ocr.pdf
-	├── rendered
 	│   └── images
 	│       ├── noteshrink
 	│       │   └── images
 	│       │       ├── files.txt
 	│       │       ├── noteshrink.cli
 	│       │       ├── noteshrink.log
-	│       │       ├── page-1.png
+	│       │       ├── page-000.png
 	│       │       └── tesseract
-	│       │           └── pdf
+	│       │           └── textpdf
 	│       │               ├── files.txt
 	│       │               ├── ocr.cli
 	│       │               ├── ocr.log
 	│       │               └── ocr.pdf
-	│       └── page-1.png
+	│       └── page-000.jpg
+	├── rendered
+	│   └── 100
+	│       ├── page-1.png
+	│       └── pdf
+	│           ├── combined
+	│           │   ├── full.pdf
+	│           │   ├── qpdf.cli
+	│           │   └── qpdf.log
+	│           ├── files.txt
+	│           └── images.pdf
 	└── typewritten_bw_aamunkoitto.pdf
 
 
 
-
-PDFSense mounts 'data' directory from host machine to container. This allows you to use following setup, where you can see the result of each action immediately in your file browser:
+PDFSense mounts 'data' directory from host machine to the container. This allows you to use following setup, where you can examine the result of each action immediately in your file browser:
 
 ![ideal setup](https://github.com/artturimatias/PDFSense/blob/master/images/setup.jpg)
 
@@ -109,8 +109,10 @@ After then we can try run OCR again for rotated images.
 ### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
 Extracts text (pdf2text) or images (pdfimages) from PDF
 
-### POST api/uploads/[UPLOAD_ID]/rendered/images
-Renders images from PDF
+### POST api/uploads/[UPLOAD_ID]/rendered/[RESOLUTION]
+Renders images from PDF with resolution defined in path. For example:
+
+	POST api/uploads/[UPLOAD_ID]/rendered/300
 
 ### POST ../sharp/rotated?angle=ANGLE
 Rotate images. Add to extracted or rendered images path.
@@ -118,8 +120,22 @@ Rotate images. Add to extracted or rendered images path.
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)
 
-### POST ../tesseract/[text|pdf]?language=LANG_CODE
-Do OCR and output PDF or text
+### POST ../tesseract/[text|pdf|textpdf]?language=LANG_CODE
+Do OCR and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
+Note the language query parameter! **Make sure you have installed tesseract language package for your language** (see Dockerfile)
+
+### POST ../pdf
+Generate PDF from images. For example:
+
+	POST api/uploads/[UPLOAD_ID]/rendered/300/pdf
+
+### POST ../pdf/combined
+Add text only PDF to PDF generated from images. Run this from path where your image PDF is. For example:
+
+	POST api/uploads/[UPLOAD_ID]/rendered/300/pdf
+
+PDFSense scans directory tree in order to find text only PDF produced by /tesseract/textpdf -endpoint.
+
 
 ### POST api/uploads/[UPLOAD_ID]/zip
 Create a zip archive with all files and directories produced by PDFSense
@@ -136,19 +152,22 @@ https://github.com/mzucker/noteshrink
 
 https://pypi.org/project/poppler-utils/
 
+https://github.com/qpdf/qpdf
+
 https://github.com/mzsanford/cld
 
-If you are looking for
+If you just want to OCR pdf files and have searchable pdf as output, then try [OCRmyPDF](https://github.com/jbarlow83/OCRmyPDF)
 
 ## FAQ
 
 ### Result of OCR is totally gibberish
 
-One possible explanation for a very bad OCR result is the wrong orientation of images. If images are "sideways", then OCR might not be able to detect text lines.
-Make sure that images are really rotated and not pseudo rotated with Exif orientation.
+First, make sure that you have set the language right (linke ?lang=FIN) and that you have required language pack installed (see Dockerfile).
+Also one possible explanation for a very bad OCR result is the wrong orientation of images. If images are "sideways", then OCR might not be able to detect text lines.
+For black/white scan I recommend using 'noteshrink' (/noteshrink/images) before doing OCR.
 
 
-### What's the difference between "extracted/images" and "rendered/images"?
+### What's the difference between "extracted" and "rendered" images?
 
 The command path "extracted/images" takes images from PDF as their native resolution and format by using Poppler util called "pdfimages". In some cases this might produce images being badly orientated or images without cropping that was present in original PDF.
-However, "rendered/images" are rendered from PDF by pdftoppm. These images are like screenshots of pages with desired resolution. The cropbox option is sometimes useful in order to get images in their cropped (visible in PDF) form.
+However, images from "rendered/[RESOLUTION]" are rendered from PDF by pdftoppm. These images are like screenshots of pages with desired resolution. The cropbox option is sometimes useful in order to get images in their cropped (visible in PDF) form.

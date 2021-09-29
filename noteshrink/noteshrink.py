@@ -549,8 +549,8 @@ def notescan_main(options):
         if img is None:
             continue
 
-        output_filename = '{}{:04d}.png'.format(
-            options.basename, len(outputs))
+        output_filename = '{}.png'.format(	# change by artturimatias
+            options.basename)
 
         if not options.quiet:
             print('opened', input_filename)
@@ -575,7 +575,7 @@ def notescan_main(options):
         if not options.quiet:
             print('  done\n')
 
-    #emit_pdf(outputs, options)
+    #emit_pdf(outputs, options) # change by artturimatias
 
 ######################################################################
 
