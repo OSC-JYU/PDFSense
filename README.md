@@ -54,15 +54,21 @@ PDFSense uses weird but handy command path API.
 
 ### 1. Initial upload of original input file
 
-First we must upload the original input file. This creates an unique id which is used as a base path for actual processing commands.
+First we must upload the original PDF. This creates an unique id which is used as a base path for actual processing commands.
+[httpie](https://httpie.io/):
 
 	http --form POST :8200/api/uploads file@myfile.pdf
+
+curl:
+
+	curl -F "file=@myfile.pdf" http://localhost:8200/api/uploads
 
 This returns upload id and some other information
 
     {
-    "fileid": "2021.09.09_08:29:32-myfile.pdf",
-    "filepath": "tmp/2021.09.09_08:29:32-myfile.pdf/myfile.pdf",
+    "fileid": "myfile.pdf",
+    "filepath": "tmp/myfile.pdf/myfile.pdf",
+	"path":":8200/api/uploads/myfile.pdf",
     "name": "myfile.pdf",
     "size": 9473628,
     "type": "application/pdf"
@@ -73,21 +79,21 @@ This returns upload id and some other information
 
 Now we can extract images from PDF by adding command **extracted/images** to the path
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images
+        http POST :8200/api/uploads/myfile.pdf/extracted/images
 
 This returns a list of images
 
         {"files":["page-000.jpg","page-001.jpg" ... ]}
 
-We can now refer to extracted images by path "/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images".
+We can now refer to extracted images by path "/api/uploads/myfile.pdf/extracted/images".
 We can further process the result of image extraction by adding a new command path to the path.
 
-### 3. Process extracted images
+### 3. Process images
 
 Let's apply some processing to these images. In this case let's test OCR.
 We add command **tesseract/text** to the path.
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/tesseract/text?language=fin
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/tesseract/text?language=fin
 
 This runs tesseract and creates one text file per image and additonal file called "fulltext.txt".
 
@@ -97,45 +103,60 @@ If the result of OCR was not satisfying, we must identify the problem and furthe
 
 We just remove the previous command from path (tesseract/text) and apply sharp command **sharp/rotate**.
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate?angle=90
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/sharp/rotate?angle=90
 
 After then we can try run OCR again for rotated images.
 
-        http POST :8200/api/uploads/2021.09.09_08:29:32-myfile.pdf/extracted/images/sharp/rotate/tesseract/text?lang=fin
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/sharp/rotate/tesseract/text?lang=fin
 
 
 ## Endpoints
 
+### POST api/uploads
+Upload PDF and get upload id.
+
 ### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
 Extracts text (pdf2text) or images (pdfimages) from PDF
+
+	curl -F "file=@my.pdf" http://localhost:8200/api/uploads
+
+or with [httpie](https://httpie.io/):
+
+	http --form :8200/api/uploads file@my.pdf
 
 ### POST api/uploads/[UPLOAD_ID]/rendered/[RESOLUTION]
 Renders images from PDF with resolution defined in path. For example:
 
-	POST api/uploads/[UPLOAD_ID]/rendered/300
+	http POST api/uploads/my.pdf/rendered/300
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
 ### POST ../sharp/rotated?angle=ANGLE
 Rotate images. Add to extracted or rendered images path.
 
+	http POST api/uploads/my.pdf/rendered/300/sharp/rotated
+
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)
+
+	http POST api/uploads/my.pdf/rendered/300/noteshrink/images
 
 ### POST ../tesseract/[text|pdf|textpdf]?lang=LANG_CODE
 Do OCR and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
 Note the language query parameter! Default language is 'eng'. **Make sure you have installed tesseract language package for your language** (see Dockerfile, eng, fin and swe are installed by default)
 
+	http POST api/uploads/my.pdf/rendered/300/noteshrink/images/tesseract/pdf?lang=fin
+
 ### POST ../pdf
 Generate PDF from images. For example:
 
-	POST api/uploads/[UPLOAD_ID]/rendered/300/pdf
+	POST api/uploads/my.pdf/rendered/300/pdf
 
 ### POST ../pdf/combined
 Create searchable PDF by adding text-only PDF to the PDF generated from images. This can be used for creating **searchable PDF with low resolution images**.
 Run this from path where your image PDF is. For example:
 
-	POST api/uploads/[UPLOAD_ID]/rendered/100/pdf/combined
+	POST api/uploads/my.pdf/rendered/100/pdf/combined
 
 PDFSense scans directory tree in order to find text only PDF (produced by /tesseract/textpdf -endpoint). That's why you should have only one text only PDF in your tree.
 
