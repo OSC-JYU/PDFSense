@@ -132,11 +132,12 @@ Generate PDF from images. For example:
 	POST api/uploads/[UPLOAD_ID]/rendered/300/pdf
 
 ### POST ../pdf/combined
-Add text only PDF to PDF generated from images. Run this from path where your image PDF is. For example:
+Create searchable PDF by adding text-only PDF to the PDF generated from images. This can be used for creating **searchable PDF with low resolution images**.
+Run this from path where your image PDF is. For example:
 
-	POST api/uploads/[UPLOAD_ID]/rendered/300/pdf
+	POST api/uploads/[UPLOAD_ID]/rendered/100/pdf/combined
 
-PDFSense scans directory tree in order to find text only PDF produced by /tesseract/textpdf -endpoint.
+PDFSense scans directory tree in order to find text only PDF (produced by /tesseract/textpdf -endpoint). That's why you should have only one text only PDF in your tree.
 
 
 ### POST api/uploads/[UPLOAD_ID]/zip
