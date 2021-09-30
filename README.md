@@ -114,6 +114,8 @@ Renders images from PDF with resolution defined in path. For example:
 
 	POST api/uploads/[UPLOAD_ID]/rendered/300
 
+Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
+
 ### POST ../sharp/rotated?angle=ANGLE
 Rotate images. Add to extracted or rendered images path.
 
@@ -162,7 +164,7 @@ If you just want to OCR pdf files and have searchable pdf as output, then try [O
 
 ### Result of OCR is totally gibberish
 
-First, make sure that you have set the language right (linke ?lang=FIN) and that you have required language pack installed (see Dockerfile).
+First, make sure that you have set the language right (like '?lang=fin') and that you have required language pack installed (see Dockerfile).
 Also one possible explanation for a very bad OCR result is the wrong orientation of images. If images are "sideways", then OCR might not be able to detect text lines.
 For black/white scan I recommend using 'noteshrink' (/noteshrink/images) before doing OCR.
 

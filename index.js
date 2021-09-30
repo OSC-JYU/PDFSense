@@ -98,7 +98,7 @@ router.post('/api/uploads', async function (ctx) {
 	const file = ctx.request.files.file;
 	//console.log(file)
 	if(!file) throw(new Error('File upload failed'))
-	const upload = await pdfsense.initialUpload(file)
+	const upload = await pdfsense.initialUpload(file, ctx.query.with_date)
 	ctx.body = {
 		fileid: upload.file_id,
 		filepath: upload.path,
@@ -168,6 +168,7 @@ router.post('/api/uploads/:fileid/(.*)/pdf',async function (ctx, next) {
 
 
 router.delete('/api/uploads/:fileid', async function (ctx) {
+	const result = pdfsense.removeUpload(ctx.params.fileid)
 	ctx.body = 'PDFSense here';
 });
 

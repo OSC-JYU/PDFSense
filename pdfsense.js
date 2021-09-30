@@ -28,7 +28,7 @@ class PDFSense {
 		const filepath = path.join(input_path, filename)
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFImages(filepath, path.join(input_path, output_path))
-		var files = await fsp.readdir(path.join(input_path, output_path))
+		var files = await this.getFileList(path.join(input_path, output_path), '')
 		var response = {files: files}
 		return response
 	}
@@ -47,7 +47,11 @@ class PDFSense {
 
 	async renderImagesFromPDF(params, options, query) {
 		if(!params.resolution || !parseInt(params.resolution)) throw('Invalid render resolution (must be integer)')
+
 		options.resolutionXYAxis = parseInt(params.resolution)
+		if(query.format && query.format === 'jpg') options.jpegFile = true
+		else options.pngFile = true
+		if(!options.cropBox) options.cropBox = true
 
 		var filename = this.getFilenameFromFileID(params.fileid)
 		const input_path = path.join(ROOT, params.fileid)
@@ -55,8 +59,10 @@ class PDFSense {
 		const filepath = path.join(input_path, filename)
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 
-		await this.PDFToPpm(filepath, path.join(input_path, output_path), options)
-		var files = await fsp.readdir(path.join(input_path, output_path))
+		//await this.PDFToPpm(filepath, path.join(input_path, output_path), options)
+		const poppler = new Poppler('/usr/bin/');
+		await poppler.pdfToPpm(filepath, path.join(input_path, output_path) + '/page', options);
+		var files = await this.getFileList(path.join(input_path, output_path), '')
 		var response = {files: files}
 		return response
 	}
@@ -192,7 +198,9 @@ class PDFSense {
 
 		for(const file of filelist) {
 			try {
-				var out = await this.noteshrink_spawn(file, options, out_path)
+				var outfile = path.basename(file).split('.').slice(0, -1).join('.')
+				var args = ['noteshrink/noteshrink.py', '-b'+out_path+'/'+outfile, file]
+				var out = await this.spawn('python3', args)
 				result.cli.push(out.cli)
 				result.log.push(out.log)
 			} catch(e) {
@@ -203,42 +211,6 @@ class PDFSense {
 		await fsp.writeFile(path.join(out_path, 'noteshrink.cli'), result.cli.join('\n'), 'utf8')
 		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
 		return result
-	}
-
-	noteshrink_spawn(file, options, out_path) {
-		const spawn = require("child_process").spawn
-		var result = {log: [], cli: '', exitcode: ''}
-		var outfile = path.basename(file).split('.').slice(0, -1).join('.')
-
-		 return new Promise((resolve, reject) => {
-			var child = spawn('python3', ['noteshrink/noteshrink.py', '-b'+out_path+'/'+outfile, file]);
-			console.log(child.spawnargs)
-			result.cli = child.spawnargs.join(' ')
-
-			child.stdout.setEncoding('utf8');
-	 		child.stdout.on('data', function (data) {
-	 			console.log('stdout: ' + data);
-				result.log.push(data)
-	 		});
-			child.stderr.setEncoding('utf8');
-	 		child.stderr.on('data', function (data) {
-	 			console.log('stderr: ' + data);
-				result.log.push(data)
-	 		});
-	 		child.on('close', function (code) {
-	 			console.log('child process exited with code ' + code);
-				result.log.push(code)
-				result.exitcode = code
-				resolve(result)
-	 			//file.end();
-	 		});
-			child.on('error', function (code) {
-	 			console.log('child process errored with code ' + code);
-				result.exitcode = code
-				reject(result)
-	 			//file.end();
-	 		});
-		 })
 	}
 
 	async combinePDFs(params, options, url_path, query) {
@@ -252,14 +224,15 @@ class PDFSense {
 		//console.log(dirs)
 		// find out where textonly PDF is (ocr.pdf)
 		var dirs = []
-		for await (const f of this.getTextPdfDirs('./')) {
+		for await (const f of this.getTextPdfDirs(path.join(ROOT, file_id))) {
   			console.log(f);
 			dirs.push(f)
 		}
 		console.log(dirs)
 		var result = {}
 		if(dirs.length > 0) {
-			result = await this.qpdf_spawn(input_path, path.join(ROOT,dirs[dirs.length-1]), out_path)
+			var args = ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',dirs[dirs.length-1] + '/ocr.pdf','--',out_path + '/full.pdf']
+			result = await this.spawn('qpdf', args)
 			result.used_textonlypdf = dirs[dirs.length-1]
 			if(dirs.length > 1) {
 				result.textonlypdf_dirs = dirs
@@ -272,43 +245,6 @@ class PDFSense {
 
 	}
 
-	async qpdf_spawn(input_path, ocr_path, out_path) {
-		var ocr = 'data/typewritten_bw_aamunkoitto.pdf-2021_09_29_070445/extracted/images/tesseract/textpdf/ocr.pdf'
-		const spawn = require("child_process").spawn
-		var result = {log: [], cli: '', exitcode: ''}
-		//var outfile = path.basename(file).split('.').slice(0, -1).join('.')
-
-		 return new Promise((resolve, reject) => {
-			var child = spawn('qpdf', ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',ocr_path + '/ocr.pdf','--',out_path + '/full.pdf']);
-			console.log(child.spawnargs)
-			result.cli = child.spawnargs.join(' ')
-
-			child.stdout.setEncoding('utf8');
-	 		child.stdout.on('data', function (data) {
-	 			console.log('stdout: ' + data);
-				result.log.push(data)
-	 		});
-			child.stderr.setEncoding('utf8');
-	 		child.stderr.on('data', function (data) {
-	 			console.log('stderr: ' + data);
-				result.log.push(data)
-	 		});
-	 		child.on('close', function (code) {
-	 			console.log('child process exited with code ' + code);
-				result.log.push(code)
-				result.exitcode = code
-				resolve(result)
-	 			//file.end();
-	 		});
-			child.on('error', function (code) {
-	 			console.log('child process errored with code ' + code);
-				result.exitcode = code
-				reject(result)
-	 			//file.end();
-	 		});
-		 })
-	}
-
 	async images2PDF(params, options, url_path, query) {
 		const file_id = params.fileid
 		const command_path = `/pdf`
@@ -318,20 +254,21 @@ class PDFSense {
 		const out_path =  path.join(ROOT, file_id, p)
 		await fsp.mkdir(out_path, { recursive: true })
 		var filelist = await this.getFileList(input_path, input_path)
-		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
-		var result = await this.convert_spawn(filelist.join(' '), options, out_path)
+		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist, 'utf8')
+		filelist.push('-o')
+		filelist.push(out_path + '/images.pdf')
+		var result = await this.spawn('img2pdf', filelist)
 		await fsp.writeFile(path.join(out_path, 'convert.cli'), result.cli, 'utf8')
 		await fsp.writeFile(path.join(out_path, 'convert.log'), result.log.join('\n'), 'utf8')
 		return result
 	}
 
-	convert_spawn(filelist, options, out_path) {
+	spawn(command, args) {
 		const spawn = require("child_process").spawn
 		var result = {log: [], cli: '', exitcode: ''}
-		//var outfile = path.basename(file).split('.').slice(0, -1).join('.')
 
 		 return new Promise((resolve, reject) => {
-			var child = spawn('convert', [filelist, out_path + '/images.pdf']);
+			var child = spawn(command, args);
 			console.log(child.spawnargs)
 			result.cli = child.spawnargs.join(' ')
 
@@ -376,13 +313,6 @@ class PDFSense {
 		// create new PDF
 	}
 
-	async PDFToPpm(filepath, outpath, options) {
-		options.pngFile = true // we always use png
-		if(!options.cropBox) options.cropBox = true
-		const poppler = new Poppler('/usr/bin/');
-		await poppler.pdfToPpm(filepath, outpath + '/page', options);
-
-	}
 
 	async PDFToText(filepath, outpath, options) {
 		if(!options) {
@@ -443,19 +373,22 @@ class PDFSense {
 		return end;
 	}
 
-	async initialUpload(file) {
+	async initialUpload(file, with_date) {
 		var sanitize = require("sanitize-filename");
-
 		const filename_clean = sanitize(file.name)
 		//const file_id = uuid()
-		const file_id = this.createFileID(filename_clean)
-		console.log(file_id)
-		await fsp.mkdir(path.join(ROOT, file_id))
-		const target_path = path.join(ROOT, file_id, filename_clean)
+		try {
+			const file_id = this.createFileID(filename_clean, with_date)
+			console.log(file_id)
+			await fsp.mkdir(path.join(ROOT, file_id))
+			const target_path = path.join(ROOT, file_id, filename_clean)
 
-		await fsp.rename(file.path, target_path)
-		return {file_id: file_id, path: target_path}
-		//await fsp.unlink(file.path)
+			await fsp.rename(file.path, target_path)
+			return {file_id: file_id, path: target_path}
+		} catch (e) {
+			await fsp.unlink(file.path) // remove uploaded file
+			throw(e)
+		}
 	}
 
 
@@ -476,10 +409,8 @@ class PDFSense {
 
 	}
 
-
-	async removePDF(pdf_id) {
-
-
+	async removeUpload(file_id) {
+		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
 	}
 
 	getFilenameFromFileID(file_id) {
@@ -503,7 +434,7 @@ class PDFSense {
 	}
 
 	async * getTextPdfDirs(dir) {
-		const dirents = await fsp.readdir(path.join(ROOT, dir), { withFileTypes: true });
+		const dirents = await fsp.readdir(dir, { withFileTypes: true });
 		for (const dirent of dirents) {
 			//console.log(dir)
 			//console.log(dirent.name)
@@ -515,7 +446,8 @@ class PDFSense {
 		}
 	}
 
-	createFileID(filename) {
+	createFileID(filename, with_date) {
+		if(!with_date) return filename
 		function pad2(n) { return n < 10 ? '0' + n : n }
 		var date = new Date();
 		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) + pad2( date.getMinutes() ) + pad2( date.getSeconds() )
