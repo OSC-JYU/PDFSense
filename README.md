@@ -115,14 +115,16 @@ After then we can try run OCR again for rotated images.
 ### POST api/uploads
 Upload PDF and get upload id.
 
-### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
-Extracts text (pdf2text) or images (pdfimages) from PDF
-
 	curl -F "file=@my.pdf" http://localhost:8200/api/uploads
 
 or with [httpie](https://httpie.io/):
 
 	http --form :8200/api/uploads file@my.pdf
+
+### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
+Extracts text (pdf2text) or images (pdfimages) from PDF
+
+	http POST api/uploads/my.pdf/extracted/images
 
 ### POST api/uploads/[UPLOAD_ID]/rendered/[RESOLUTION]
 Renders images from PDF with resolution defined in path. For example:
