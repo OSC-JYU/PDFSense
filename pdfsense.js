@@ -26,6 +26,7 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'extracted/images'
 		const filepath = path.join(input_path, filename)
+		if(!await this.exists(filepath)) throw('Upload path not found!')
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFImages(filepath, path.join(input_path, output_path))
 		var files = await this.getFileList(path.join(input_path, output_path), '')
@@ -38,6 +39,7 @@ class PDFSense {
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'extracted/text'
 		const filepath = path.join(input_path, filename)
+		if(!await this.exists(filepath)) throw(`Upload path not found! file: ${file_id}`)
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFToText(filepath, path.join(input_path, output_path))
 		var files = await fsp.readdir(path.join(input_path, output_path))
@@ -49,7 +51,7 @@ class PDFSense {
 		if(!params.resolution || !parseInt(params.resolution)) throw('Invalid render resolution (must be integer)')
 
 		options.resolutionXYAxis = parseInt(params.resolution)
-		if(query.format && query.format === 'jpg') options.jpegFile = true
+		if(query.format && ['jpg', 'jpeg'].includes(query.format)) options.jpegFile = true
 		else options.pngFile = true
 		if(!options.cropBox) options.cropBox = true
 
@@ -57,6 +59,7 @@ class PDFSense {
 		const input_path = path.join(ROOT, params.fileid)
 		const output_path = 'rendered/' + options.resolutionXYAxis
 		const filepath = path.join(input_path, filename)
+		if(!await this.exists(filepath)) throw('Upload path not found!')
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 
 		//await this.PDFToPpm(filepath, path.join(input_path, output_path), options)
@@ -446,6 +449,15 @@ class PDFSense {
 		}
 	}
 
+	async exists (path) {
+		try {
+			await fsp.access(path)
+			return true
+		} catch {
+			return false
+		}
+	}
+
 	createFileID(filename, with_date) {
 		if(!with_date) return filename
 		function pad2(n) { return n < 10 ? '0' + n : n }
@@ -453,7 +465,6 @@ class PDFSense {
 		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) + pad2( date.getMinutes() ) + pad2( date.getSeconds() )
 		return filename + '-' + t
 	}
-
 
 }
 
