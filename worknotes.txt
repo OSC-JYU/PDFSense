@@ -11,10 +11,6 @@ tesseract -l fin files.txt out
 
 
 
-
-docker run -v=/home/arihayri/Documents/OMEKA-korttisiirto:/output johnpaulada/noteshrink /output/vaik-000.jpg -o /output/output.pdf
-
-
 convert \
 page-000.jpg -threshold 60% \
 -define connected-components:area-threshold=5 \
@@ -43,3 +39,6 @@ For autocropping:
 https://github.com/polm/ndl-crop
 
 apt-get install python3-opencv
+
+
+Kraken OCR?

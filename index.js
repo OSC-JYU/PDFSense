@@ -17,10 +17,10 @@ app.use(async function handleError(context, next) {
 	} catch (error) {
 		context.status = 500;
 		if(error.message) {
-			console.log('ERROR: ' + error.message);
+			logger.error(error.message);
 			context.body = {'error':error.message};
 		} else {
-			console.log('ERROR: ' + error);
+			logger.error(error);
 			context.body = {'error':error};
 		}
 		//debug(error.stack);
@@ -172,10 +172,10 @@ router.delete('/api/uploads/:fileid', async function (ctx) {
 	ctx.body = 'PDFSense here';
 });
 
-
-
-app.use(function *(){
-  this.body = 'Invalid URL!!!';
+app.use(function (ctx,next){
+	logger.error({message:'invalid url', url:`${ctx.request.method} ${ctx.request.url}`})
+	ctx.body = {error:`Invalid URL!!!${ctx.request.method} ${ctx.request.url}`}
+	ctx.status = 404
 });
 
 // ROUTES ENDS

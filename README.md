@@ -197,3 +197,12 @@ For black/white scan I recommend using 'noteshrink' (/noteshrink/images) before 
 
 The command path "extracted/images" takes images from PDF as their native resolution and format by using Poppler util called "pdfimages". In some cases this might produce images being badly orientated or images without cropping that was present in original PDF.
 However, images from "rendered/[RESOLUTION]" are rendered from PDF by pdftoppm. These images are like screenshots of pages with desired resolution. The cropbox option is sometimes useful in order to get images in their cropped (visible in PDF) form.
+
+### docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /data.
+
+This happens when you run "**sudo** make start". The variable PWD is not then set. You either run sudo with E option:
+
+	sudo -E make start
+
+Or, you can make sure that you can run docker commands as a regular user:
+https://docs.docker.com/engine/install/linux-postinstall/
