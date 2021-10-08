@@ -82,12 +82,57 @@ class PDFSense {
 		if(query.angle) {
 			angle = parseInt(query.angle)
 		}
-		for(const f of files) {
-			console.log(f)
-			await sharp(path.join(input_path, f)).rotate(angle).toFile(path.join(out_path, f))
 
+		var commands = params.sharp_command.split('_')
+		if(commands.length == 1) {
+			for(const f of files) {
+				console.log(`${commands[0]} ${this.getParams(query,commands[0])} ${f} `)
+				await sharp(path.join(input_path, f))[commands[0]](this.getParams(query,commands[0])).toFile(path.join(out_path, f))
+			}
+		} else if(commands.length == 2) {
+			for(const f of files) {
+				console.log(`${commands[0]} ${this.getParams(query,commands[0])} ${commands[1]} ${this.getParams(query,commands[1])} ${f} `)
+				await sharp(
+					path.join(input_path, f))
+					[commands[0]](this.getParams(query,commands[0]))
+					[commands[1]](this.getParams(query,commands[1]))
+					.toFile(path.join(out_path, f))
+			}
+		} else if(commands.length == 3) {
+			for(const f of files) {
+				console.log(`${commands[0]} ${this.getParams(query,commands[0])} ${commands[1]} ${this.getParams(query,commands[1])} ${commands[2]} ${this.getParams(query,commands[2])} ${f} `)
+				await sharp(
+					path.join(input_path, f))
+					[commands[0]](this.getParams(query,commands[0]))
+					[commands[1]](this.getParams(query,commands[1]))
+					[commands[2]](this.getParams(query,commands[2]))
+					.toFile(path.join(out_path, f))
+			}
 		}
+	}
 
+	getParams(query, command) {
+		var out = null
+		const sharp_params = {
+			rotate: {'angle': 90},
+			blur: {'sigma':1},
+			sharpen: {'sigma':1},
+			flip: {},
+			flop: {},
+			trim: {'trim_threshold':10},
+			grayscale: {},
+			negate: {},
+			threshold:{'threshold': 128}
+		}
+		if(command in sharp_params) {
+			for(var p of Object.keys(sharp_params[command])) {
+				out = sharp_params[command][p]
+				if(query[p]) {
+					out = parseInt(query[p])
+				}
+			}
+		}
+		return out
 	}
 
 	async tesseract(params, options, url_path, query) {

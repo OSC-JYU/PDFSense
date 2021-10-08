@@ -138,7 +138,7 @@ router.post('/api/uploads/:fileid/zip', async function (ctx) {
 
 // catch sharp commands
 router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
-	const result = await pdfsense.sharp(ctx.params.fileid, ctx.request.body, ctx.path, ctx.params.sharp_command)
+	const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
 

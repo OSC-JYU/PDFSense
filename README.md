@@ -133,10 +133,26 @@ Renders images from PDF with resolution defined in path. For example:
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
-### POST ../sharp/rotated?angle=ANGLE
+### POST ../sharp/[COMMAND]?angle=ANGLE
 Rotate images. Add to extracted or rendered images path.
 
-	http POST api/uploads/my.pdf/rendered/300/sharp/rotated
+	http POST api/uploads/my.pdf/rendered/300/sharp/rotate?angle=-90
+
+Commands and their parameter with default values:
+
+	rotate: {'angle': 90},
+	blur: {'sigma':1},
+	sharpen: {'sigma':1},
+	flip: {},
+	flop: {},
+	trim: {'trim_threshold':10},
+	grayscale: {},
+	negate: {},
+	threshold:{'threshold': 128}
+
+You can also chain max. 3 commands to a single request like this:
+
+	http POST api/uploads/my.pdf/extracted/images/sharp/rotate_trim_threshold?angle=-90&trim_threshold=50
 
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)
