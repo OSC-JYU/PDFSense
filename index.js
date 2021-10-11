@@ -110,7 +110,7 @@ router.post('/api/uploads', async function (ctx) {
 });
 
 router.post('/api/uploads/:fileid/extracted/images', async function (ctx) {
-	const result = await pdfsense.extractImagesFromPDF(ctx.params.fileid, ctx.body)
+	const result = await pdfsense.extractImagesFromPDF(ctx.params.fileid, ctx.request.body, ctx.query)
 	ctx.body = result
 })
 
@@ -140,6 +140,11 @@ router.post('/api/uploads/:fileid/zip', async function (ctx) {
 router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
 	const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
+});
+
+router.get('/api/uploads/:fileid/(.*)/sharp',async function (ctx, next) {
+	//const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = pdfsense.sharp_commands
 });
 
 // catch tesseract commands

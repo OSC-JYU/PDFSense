@@ -138,7 +138,7 @@ Rotate images. Add to extracted or rendered images path.
 
 	http POST api/uploads/my.pdf/rendered/300/sharp/rotate?angle=-90
 
-Commands and their parameter with default values:
+Commands and their parameters and default values:
 
 	rotate: {'angle': 90},
 	blur: {'sigma':1},
@@ -152,7 +152,7 @@ Commands and their parameter with default values:
 
 You can also chain max. 3 commands to a single request like this:
 
-	http POST api/uploads/my.pdf/extracted/images/sharp/rotate_trim_threshold?angle=-90&trim_threshold=50
+	http POST api/uploads/my.pdf/extracted/images/sharp/rotate_trim_threshold?angle=90&trim_threshold=50
 
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)

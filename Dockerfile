@@ -2,7 +2,7 @@ FROM ubuntu:20.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y curl poppler-utils graphicsmagick imagemagick poppler-data vim tesseract-ocr python3-pip tesseract-ocr-fin tesseract-ocr-swe
+RUN apt-get update && apt-get install -y curl poppler-utils graphicsmagick imagemagick poppler-data vim tesseract-ocr python3-pip img2pdf tesseract-ocr-fin tesseract-ocr-swe
 
 # Install Node.js
 RUN apt-get install --yes curl

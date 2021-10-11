@@ -1,5 +1,4 @@
 
-const axios 		= require('axios');
 var fs 				= require('fs');
 var fsp 			= require('fs').promises;
 const util 			= require('util');
@@ -14,22 +13,38 @@ const finished = util.promisify(stream.finished);
 
 const ROOT = 'data'
 
+const SHARP_COMMANDS = {
+	rotate: {'angle': 90},
+	blur: {'sigma':1},
+	sharpen: {'sigma':1},
+	flip: {},
+	flop: {},
+	trim: {'trim_threshold':10},
+	grayscale: {},
+	negate: {},
+	threshold:{'threshold': 128}
+}
+
 class PDFSense {
 
 	constructor(config) {
 		this.config = config
+		this.sharp_commands = SHARP_COMMANDS
 	}
 
 
-	async extractImagesFromPDF(file_id, options) {
+	async extractImagesFromPDF(file_id, options, query) {
+		if(query.format && ['jpg', 'jpeg'].includes(query.format)) options.jpegFile = true
+		if(query.format && query.format === 'png') options.pngFile = true
+		if(query.format && query.format === 'tiff') options.tiffFile = true
 		var filename = this.getFilenameFromFileID(file_id)
 		const input_path = path.join(ROOT, file_id)
 		const output_path = 'extracted/images'
 		const filepath = path.join(input_path, filename)
 		if(!await this.exists(filepath)) throw('Upload path not found!')
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
-		await this.PDFImages(filepath, path.join(input_path, output_path))
-		var files = await this.getFileList(path.join(input_path, output_path), '')
+		await this.PDFImages(filepath, path.join(input_path, output_path), options)
+		var files = await this.getFileList(path.join(input_path, output_path), '', ['.jpg','.png','.tiff','.ppm','.pbm','.ccitt'])
 		var response = {files: files}
 		return response
 	}
@@ -88,6 +103,7 @@ class PDFSense {
 			for(const f of files) {
 				console.log(`${commands[0]} ${this.getParams(query,commands[0])} ${f} `)
 				await sharp(path.join(input_path, f))[commands[0]](this.getParams(query,commands[0])).toFile(path.join(out_path, f))
+
 			}
 		} else if(commands.length == 2) {
 			for(const f of files) {
@@ -113,24 +129,15 @@ class PDFSense {
 
 	getParams(query, command) {
 		var out = null
-		const sharp_params = {
-			rotate: {'angle': 90},
-			blur: {'sigma':1},
-			sharpen: {'sigma':1},
-			flip: {},
-			flop: {},
-			trim: {'trim_threshold':10},
-			grayscale: {},
-			negate: {},
-			threshold:{'threshold': 128}
-		}
-		if(command in sharp_params) {
-			for(var p of Object.keys(sharp_params[command])) {
-				out = sharp_params[command][p]
+		if(command in SHARP_COMMANDS) {
+			for(var p of Object.keys(SHARP_COMMANDS[command])) {
+				out = SHARP_COMMANDS[command][p]
 				if(query[p]) {
 					out = parseInt(query[p])
 				}
 			}
+		} else {
+			throw(`Sharp command '${command}' not found! available commands: ${Object.keys(SHARP_COMMANDS)}`)
 		}
 		return out
 	}
@@ -138,55 +145,78 @@ class PDFSense {
 	async tesseract(params, options, url_path, query) {
 		const file_id = params.fileid
 		const command_path = `/tesseract/${params.tesseract_command}`
-		console.log(command_path)
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
-		const out_path =  path.join(ROOT, file_id, p)
+		const out_path =  path.join(ROOT, file_id, p + '/')
 		var files = await this.getFileList(input_path, input_path)
+
+		try {
+			await fsp.mkdir(out_path, { recursive: true })
+			await fsp.writeFile(path.join(out_path, 'files.txt'), files.join('\n'), 'utf8')
+		} catch(e) {
+			throw('Could not create files.txt ' + e)
+		}
+
 		if(query.lang) {
 			options.lang = query.lang
 		}
 		console.log(`tesseract options: ${JSON.stringify(options, null, 2)}`)
 		if(params.tesseract_command === 'pdf') {
-			 await this.tesseractToPDF(files, options, out_path)
+			options.pdf = true
+			 await this.tesseractToPDF(files, options, out_path, 'full')
 		} else if(params.tesseract_command === 'textpdf') {
+			options.pdf = true
 			if(!options.c) options.c = {}
 			options.c['textonly_pdf'] = 1
-			await this.tesseractToPDF(files, options, out_path)
+			await this.tesseractToPDF(files, options, out_path, 'ocr')
 		} else {
-			await this.tesseractToTextFile(files, options, out_path)
+			await this.tesseractToText(files, options, out_path, '')
 		}
 	}
 
-	async tesseractToTextFile(filelist, options, out_path) {
-		await fsp.mkdir(out_path, { recursive: true })
-		const tesseract = require("node-tesseract-ocr")
-		let result = []
+	async tesseractToText(filelist, options, out_path, outfile) {
+
+		let result = {}
 		for(const f of filelist) {
 			const used = process.memoryUsage().heapUsed / 1024 / 1024;
 			console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
 			console.log('processing ' + f)
-			const text = await tesseract.recognize(f, options)
-			await fsp.writeFile(path.join(out_path, path.basename(f) + '.txt'), text, 'utf8')
-			result.push(text)
+			//const text = await tesseract.recognize(f, options)
+			try {
+				result = await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)))
+				await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
+				await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
+			} catch(e) {
+				console.log(e)
+				await fsp.writeFile(path.join(out_path, 'ocr.cli'), e.cli.join(' '), 'utf8')
+				await fsp.writeFile(path.join(out_path, 'ocr.log'), e.log.join(' '), 'utf8')
+			}
+			//await fsp.writeFile(path.join(out_path, path.basename(f) + '.txt'), text, 'utf8')
+			//result.push(text)
 		}
 		// create fulltext.txt
-		result = result.map((x , index) => '\n\n--- ' + index + ' ---\n\n' + x )
-		await fsp.writeFile(path.join(out_path, 'fulltext.txt'), result.join(''), 'utf8')
+		//result = result.map((x , index) => '\n\n--- ' + index + ' ---\n\n' + x )
+		//await fsp.writeFile(path.join(out_path, 'fulltext.txt'), result.join(''), 'utf8')
+		console.log('OCR done')
 		return 'done'
 	}
 
-	async tesseractToPDF(filelist, options, out_path) {
-		await fsp.mkdir(out_path, { recursive: true })
-		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
-		var result = await this.tesseract_spawn(filelist, options, out_path)
-		await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
-		await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join('\n'), 'utf8')
-
+	async tesseractToPDF(filelist, options, out_path, outfile) {
+		var result = {}
+		try {
+			result = await this.tesseract_spawn(filelist, options, out_path, outfile)
+			await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
+			await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join('\n'), 'utf8')
+		} catch(e) {
+			if(e.cli) await fsp.writeFile(path.join(out_path, 'ocr.cli'), e.cli.join(' '), 'utf8')
+			if(e.log) await fsp.writeFile(path.join(out_path, 'ocr.log'), e.log.join('\n'), 'utf8')
+			throw(e)
+		}
+		console.log('OCR done')
 		return 'done'
 	}
 
-	tesseract_spawn(filelist, options, out_path) {
+	tesseract_spawn(filelist, options, out_path, outfile) {
 		const spawn = require("child_process").spawn
 		var args = []
 		if(options.c) {
@@ -195,11 +225,17 @@ class PDFSense {
 				args.push(`${parameter}=${options.c[parameter]}`)
 			}
 		}
-		args.push(path.join(out_path, 'files.txt'))
-		args.push(path.join(out_path, 'ocr'))
-		args.push('pdf')
+		if(options.lang) {
+			args.push('-l')
+			args.push(options.lang)
+		}
+		if(Array.isArray(filelist)) args.push(path.join(out_path, 'files.txt'))
+		else args.push(filelist)
+
+		args.push(path.join(out_path, outfile))
+		if(options.pdf) args.push('pdf')
 		var result = {log: [], cli: '', exitcode: ''}
-		//var id = this.getFilenameFromFileID()
+
 		 return new Promise((resolve, reject) => {
 			 var child = spawn('tesseract', args);
 			 console.log(child.spawnargs)
@@ -219,13 +255,11 @@ class PDFSense {
 				result.log.push(code)
 				result.exitcode = code
 				resolve(result)
-	 			//file.end();
 	 		});
 			child.on('error', function (code) {
 	 			console.log('child process errored with code ' + code);
 				result.exitcode = code
 				reject(result)
-	 			//file.end();
 	 		});
 		 })
 	}
@@ -440,23 +474,6 @@ class PDFSense {
 	}
 
 
-	async downloadFile(fileUrl) {
-		const file_id = uuid()
-		const writer = fs.createWriteStream(path.join(ROOT, file_id));
-		return new Promise(function(resolve, reject) {
-			axios({
-				method: 'get',
-				url: fileUrl,
-				responseType: 'stream',
-			}).then(async response => {
-				response.data.pipe(writer);
-				resolve({'file_id':file_id})
-				//return finished(writer); //this is a Promise
-			});
-		});
-
-	}
-
 	async removeUpload(file_id) {
 		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
 	}
@@ -465,12 +482,13 @@ class PDFSense {
 		return file_id.split('-')[0]
 	}
 
-	async getFileList(input_path, fullpath) {
+	async getFileList(input_path, fullpath, filter) {
+		if(!filter) filter = ['.png','.jpg','.tiff']
 		var files = await fsp.readdir(input_path, { withFileTypes: true })
 		return files
 			.filter(dirent => dirent.isFile())
         	.map(dirent => dirent.name)
-			.filter(f => ['.png','.jpg'].includes(path.extname(f)))
+			.filter(f => filter.includes(path.extname(f)))
 			.map(x => path.join(fullpath, x))
 	}
 
@@ -484,8 +502,6 @@ class PDFSense {
 	async * getTextPdfDirs(dir) {
 		const dirents = await fsp.readdir(dir, { withFileTypes: true });
 		for (const dirent of dirents) {
-			//console.log(dir)
-			//console.log(dirent.name)
 			const res = path.join(dir, dirent.name);
 			if (dirent.isDirectory()) {
 				if(res.includes('tesseract/textpdf')) yield res;
