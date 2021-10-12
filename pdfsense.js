@@ -183,7 +183,7 @@ class PDFSense {
 			console.log('processing ' + f)
 			//const text = await tesseract.recognize(f, options)
 			try {
-				result = await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)))
+				result = await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), outfile)
 				await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
 				await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
 			} catch(e) {
@@ -231,7 +231,6 @@ class PDFSense {
 		}
 		if(Array.isArray(filelist)) args.push(path.join(out_path, 'files.txt'))
 		else args.push(filelist)
-
 		args.push(path.join(out_path, outfile))
 		if(options.pdf) args.push('pdf')
 		var result = {log: [], cli: '', exitcode: ''}
