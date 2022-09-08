@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y curl poppler-utils graphicsmagick image
 
 # Install Node.js
 RUN apt-get install --yes curl
-RUN curl --silent --location https://deb.nodesource.com/setup_12.x | bash -
+RUN curl --silent --location https://deb.nodesource.com/setup_18.x | bash -
 RUN apt-get install -y nodejs
 
 
