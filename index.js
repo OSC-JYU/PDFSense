@@ -4,10 +4,12 @@ const bodyParser	= require('koa-body');
 const json			= require('koa-json')
 const winston 		= require('winston');
 const PDFSense		= require("./pdfsense.js")
+const Batch		= require("./batch.js")
 
 var app				= new Koa();
 var router			= new Router();
 const pdfsense 		= new PDFSense()
+const batch 		= new Batch()
 
 
 app.use(async function handleError(context, next) {
@@ -171,11 +173,17 @@ router.post('/api/uploads/:fileid/(.*)/pdf',async function (ctx, next) {
 	ctx.body = result
 });
 
-
 router.delete('/api/uploads/:fileid', async function (ctx) {
 	const result = pdfsense.removeUpload(ctx.params.fileid)
 	ctx.body = 'PDFSense here';
 });
+
+router.post('/api/batch/(.*)',async function (ctx, next) {
+	const result = await batch.process(ctx.path, ctx.request.query.dir)
+	console.log(ctx.path)
+	ctx.body = result
+});
+
 
 app.use(function (ctx,next){
 	logger.error({message:'invalid url', url:`${ctx.request.method} ${ctx.request.url}`})
@@ -185,7 +193,7 @@ app.use(function (ctx,next){
 
 // ROUTES ENDS
 
-
+batch.init()
 var set_port = process.env.PORT || 8200
 var server = app.listen(set_port, function () {
 	var host = server.address().address

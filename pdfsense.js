@@ -32,9 +32,38 @@ class PDFSense {
 		this.sharp_commands = SHARP_COMMANDS
 	}
 
+	async initialUpload(file, with_date) {
+		var sanitize = require("sanitize-filename");
+		const filename_clean = sanitize(file.name)
+		//const file_id = uuid()
+		try {
+			const file_id = this.createFileID(filename_clean, with_date)
+			console.log(file_id)
+			await fsp.mkdir(path.join(ROOT, file_id))
+			const target_path = path.join(ROOT, file_id, filename_clean)
+
+			await fsp.rename(file.path, target_path)
+			return {file_id: file_id, path: target_path}
+		} catch (e) {
+			await fsp.unlink(file.path) // remove uploaded file
+			throw(e)
+		}
+	}
+
+	createFileID(filename, with_date) {
+		if(!with_date) return filename
+		function pad2(n) { return n < 10 ? '0' + n : n }
+		var date = new Date();
+		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2(date.getHours()) + ':' + pad2(date.getMinutes()) + ':' + pad2( date.getSeconds() )
+		return filename + '____' + t
+	}
+
+	async removeUpload(file_id) {
+		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
+	}
 
 	async extractImagesFromPDF(file_id, options, query) {
-		if(query.format && ['jpg', 'jpeg'].includes(query.format)) options.jpegFile = true
+		options.jpegFile = true
 		if(query.format && query.format === 'png') options.pngFile = true
 		if(query.format && query.format === 'tiff') options.tiffFile = true
 		var filename = this.getFilenameFromFileID(file_id)
@@ -183,6 +212,7 @@ class PDFSense {
 			console.log('processing ' + f)
 			//const text = await tesseract.recognize(f, options)
 			try {
+				console.log(options)
 				result = await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), outfile)
 				await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
 				await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
@@ -235,7 +265,7 @@ class PDFSense {
 		if(options.pdf) args.push('pdf')
 		var result = {log: [], cli: '', exitcode: ''}
 
-		 return new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			 var child = spawn('tesseract', args);
 			 console.log(child.spawnargs)
 			 result.cli = child.spawnargs
@@ -454,34 +484,12 @@ class PDFSense {
 		return end;
 	}
 
-	async initialUpload(file, with_date) {
-		var sanitize = require("sanitize-filename");
-		const filename_clean = sanitize(file.name)
-		//const file_id = uuid()
-		try {
-			const file_id = this.createFileID(filename_clean, with_date)
-			console.log(file_id)
-			await fsp.mkdir(path.join(ROOT, file_id))
-			const target_path = path.join(ROOT, file_id, filename_clean)
-
-			await fsp.rename(file.path, target_path)
-			return {file_id: file_id, path: target_path}
-		} catch (e) {
-			await fsp.unlink(file.path) // remove uploaded file
-			throw(e)
-		}
-	}
-
-
-	async removeUpload(file_id) {
-		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
-	}
-
 	getFilenameFromFileID(file_id) {
-		return file_id.split('-')[0]
+		return file_id.split('____')[0]
 	}
 
 	async getFileList(input_path, fullpath, filter) {
+		console.log(input_path)
 		if(!filter) filter = ['.png','.jpg','.tiff']
 		var files = await fsp.readdir(input_path, { withFileTypes: true })
 		return files
@@ -518,13 +526,6 @@ class PDFSense {
 		}
 	}
 
-	createFileID(filename, with_date) {
-		if(!with_date) return filename
-		function pad2(n) { return n < 10 ? '0' + n : n }
-		var date = new Date();
-		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2( date.getHours() ) + pad2( date.getMinutes() ) + pad2( date.getSeconds() )
-		return filename + '-' + t
-	}
 
 }
 

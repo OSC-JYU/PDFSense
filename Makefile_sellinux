@@ -1,0 +1,35 @@
+IMAGES := $(shell docker images -f "dangling=true" -q)
+CONTAINERS := $(shell docker ps -a -q -f status=exited)
+NAME := pdfsense
+VERSION := 20.04
+
+
+clean:
+	docker rm -f $(CONTAINERS)
+	docker rmi -f $(IMAGES)
+
+create_volume:
+	docker volume create $(VOLUME)
+
+build:
+	docker build -t artturimatias/$(NAME):$(VERSION) .
+
+start:
+	docker run -d --name $(NAME) \
+		-p 8200:8200 \
+		--volume $(PWD)/data:/src/data:Z \
+		--volume $(PWD)/logs:/src/logs:Z \
+		--network-alias pdfsense \
+		--user root \
+		artturimatias/$(NAME):$(VERSION)
+
+stop:
+	docker stop pdfsense
+
+restart:
+	docker stop pdfsense
+	docker rm pdfsense
+	$(MAKE) start
+
+bash:
+	docker exec -it pdfsense bash

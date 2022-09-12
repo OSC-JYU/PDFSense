@@ -93,7 +93,7 @@ We can further process the result of image extraction by adding a new command pa
 Let's apply some processing to these images. In this case let's test OCR.
 We add command **tesseract/text** to the path.
 
-        http POST :8200/api/uploads/myfile.pdf/extracted/images/tesseract/text?language=fin
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/tesseract/text?lang=fin
 
 This runs tesseract and creates one text file per image and additonal file called "fulltext.txt".
 
@@ -121,10 +121,18 @@ or with [httpie](https://httpie.io/):
 
 	http --form :8200/api/uploads file@my.pdf
 
-### POST api/uploads/[UPLOAD_ID]/extracted/[images|text]
+### POST api/uploads/[UPLOAD_ID]/extracted/images
 Extracts text (pdf2text) or images (pdfimages) from PDF
 
-	http POST api/uploads/my.pdf/extracted/images
+	http POST :8200/api/uploads/my.pdf/extracted/images?format=png
+
+Default output is jpg, but that can be changed by setting option "format". Supported formats are jpg, png and tiff
+
+### POST api/uploads/[UPLOAD_ID]/extracted/text
+Extracts text (pdf2text) or images (pdfimages) from PDF
+
+	http POST :8200/api/uploads/my.pdf/extracted/text
+
 
 ### POST api/uploads/[UPLOAD_ID]/rendered/[RESOLUTION]
 Renders images from PDF with resolution defined in path. For example:

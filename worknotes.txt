@@ -42,3 +42,6 @@ apt-get install python3-opencv
 
 
 Kraken OCR?
+
+page_dewarp:
+https://github.com/mzucker/page_dewarp
