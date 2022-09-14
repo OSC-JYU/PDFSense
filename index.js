@@ -65,7 +65,7 @@ const logger = winston.createLogger({
 logger.info('PDFSense server started');
 // LOGGING ENDS
 
-app.use(json({ pretty: true, param: 'pretty' }))
+//app.use(json({ pretty: true, param: 'pretty' }))
 
 
 router.param('sharp_command', (output, ctx, next) => {
@@ -179,8 +179,7 @@ router.delete('/api/uploads/:fileid', async function (ctx) {
 });
 
 router.post('/api/batch/(.*)',async function (ctx, next) {
-	const result = await batch.process(ctx.path, ctx.request.query.dir)
-	console.log(ctx.path)
+	const result = await batch.process(ctx.path, ctx.request.query)
 	ctx.body = result
 });
 

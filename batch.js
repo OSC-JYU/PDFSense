@@ -5,6 +5,7 @@ const util 			= require('util')
 const stream 		= require('stream')
 const path			= require('path')
 var sanitize 		= require('sanitize-filename')
+const querystring 	= require('node:querystring');
 
 const PDFSense 		= require("./pdfsense.js")
 
@@ -28,19 +29,24 @@ class Batch {
 		this.got = got
 	}
 
-	async process(req_path, dir) {
-		var files = await pdfsense.getFileList(dir, '', ['.pdf'])
+	async process(req_path, query) {
+		if(!query.dir) throw("You must give 'dir' query parameter.")
+		var files = await pdfsense.getFileList(query.dir, '', ['.pdf'])
 		const process_path = req_path.split('/api/batch/')[1]
-
+		var query_str = querystring.stringify(query)
+		
 		for(var file of files) {
 			try {
-				const file_id = await this.copyFile(dir, file)
+				const file_id = await this.copyFile(query.dir, file)
 				var commands = this.splitPath(process_path)
 				console.log(commands)
+				for(var command of commands) {
 
-				var url = `http://localhost:8200/api/uploads/${file_id}/extracted/images`
-				console.log(url)
-				var r = await this.got.post(url)
+					var url = `http://localhost:8200/api/uploads/${file_id}/${command}?${query_str}`
+					console.log(url)
+					var r = await this.got.post(url)
+				}
+
 			} catch (e) {
 				console.log(e)
 				throw(e)
