@@ -100,7 +100,7 @@ router.post('/api/uploads', async function (ctx) {
 	const file = ctx.request.files.file;
 	//console.log(file)
 	if(!file) throw(new Error('File upload failed'))
-	const upload = await pdfsense.initialUpload(file, ctx.query.with_date)
+	const upload = await pdfsense.initialUpload(file, ctx.query)
 	ctx.body = {
 		fileid: upload.file_id,
 		filepath: upload.path,
@@ -133,6 +133,13 @@ router.get('/api/uploads/:fileid/zip', async function (ctx) {
 	//ctx.body = uploads
 });
 
+// allow downloading of any single file
+router.get('/api/uploads/:fileid/(.*)/:filename', async function (ctx) {
+	ctx.body = await pdfsense.getFile(ctx.params.fileid, ctx.params.filename, ctx)
+	//ctx.body = uploads
+});
+
+
 router.post('/api/uploads/:fileid/zip', async function (ctx) {
 	const uploads = await pdfsense.createArchive(ctx.params.fileid, ctx)
 	ctx.body = uploads
@@ -152,6 +159,11 @@ router.get('/api/uploads/:fileid/(.*)/sharp',async function (ctx, next) {
 // catch tesseract commands
 router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async function (ctx, next) {
 	const result = await pdfsense.tesseract(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+});
+
+router.post('/api/uploads/:fileid/(.*)/tesseract/textpdf/combined',async function (ctx, next) {
+	const result = await pdfsense.combinePDFs(ctx.params, ctx.request.body, ctx.path, ctx.query, true)
 	ctx.body = result
 });
 
@@ -178,6 +190,7 @@ router.delete('/api/uploads/:fileid', async function (ctx) {
 	ctx.body = 'PDFSense here';
 });
 
+// very experim
 router.post('/api/batch/(.*)',async function (ctx, next) {
 	const result = await batch.process(ctx.path, ctx.request.query)
 	ctx.body = result

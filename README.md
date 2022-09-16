@@ -1,4 +1,4 @@
-# PDFSense [WORK IN PROGRESS]
+# PDFSense
 A Simple and stateful backend for text extraction, image extraction, noteshrinking, and OCR of PDF files
 
 PDFSense combines several open source PDF, image and text tools to one REST API. It tries to use sensible defaults, so that you could get good results without tinkering with the settings.
@@ -50,11 +50,13 @@ Get source, build image and start
 
 
 ## Command path API
-PDFSense uses weird but handy command path API.
+PDFSense uses weird but handy command path API. You first upload your PDF to /api/uploads (see below), then you can continue processing by using the file id which can be found from the response. You can then continut prosessing by stacking commands in the path.
+
+PDFSense includes also a python script, which allows you easily **batch process** several files.
 
 ### 1. Initial upload of original input file
 
-First we must upload the original PDF. This creates an unique id which is used as a base path for actual processing commands.
+First we must upload the original PDF. This creates an unique file id which is used as a base path for actual processing commands.
 [httpie](https://httpie.io/):
 
 	http --form POST :8200/api/uploads file@myfile.pdf
@@ -109,6 +111,30 @@ After then we can try run OCR again for rotated images.
 
         http POST :8200/api/uploads/myfile.pdf/extracted/images/sharp/rotate/tesseract/text?lang=fin
 
+### 5. Batch processing
+
+After you have experimented different settings and you are getting decent result for couple of files, you may want to process more files with same settings.
+There is a simple python script (batch.py) included with PDFSense and it is located in 'python' directory.
+
+#### batch.py
+
+Here is a commands that OCR files and then creates a searchable pdf by using the original PDF as a base and adding text-only PDF as overlay on it.
+
+    commands = [
+    '/rendered/300',
+    '/rendered/300/tesseract/textpdf?lang=fin',
+    '/rendered/300/tesseract/textpdf/combined'
+    ]
+
+So just write paths as they would be when processing files directly through API.
+
+Here is an example that makes OCR for all files in 'pdf' directory. The result is stored in myfiles/output (--download option).
+
+    python3 python/batch.py --dir ./my_files --download
+
+
+#### externally
+PDFSense is an API and you can use whatever tools in order to call API and process multiple files one by one.
 
 ## Endpoints
 
@@ -141,8 +167,10 @@ Renders images from PDF with resolution defined in path. For example:
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
-### POST ../sharp/[COMMAND]?angle=ANGLE
-Rotate images. Add to extracted or rendered images path.
+### POST ../sharp/[COMMAND]
+Use sharp for processing images. Add to extracted or rendered images path.
+
+example: rotate rendered images 90 degree counter clockwise:
 
 	http POST api/uploads/my.pdf/rendered/300/sharp/rotate?angle=-90
 
@@ -179,13 +207,21 @@ Generate PDF from images. For example:
 	POST api/uploads/my.pdf/rendered/300/pdf
 
 ### POST ../pdf/combined
-Create searchable PDF by adding text-only PDF to the PDF generated from images. This can be used for creating **searchable PDF with low resolution images**.
+Create searchable PDF by adding text-only PDF to the PDF **generated from images**. This can be used for creating **searchable PDF with low resolution images**.
+Note that this creates a new PDF file. If you want to add text layer to the original file, then use /tesseract/textpdf/combined -endpoint.
+
 Run this from path where your image PDF is. For example:
 
 	POST api/uploads/my.pdf/rendered/100/pdf/combined
 
 PDFSense scans directory tree in order to find text only PDF (produced by /tesseract/textpdf -endpoint). That's why you should have only one text only PDF in your tree.
 
+### POST ../combined
+Create searchable pdf by adding text-only PDF as overlay to the copy of the original file. **This can be used only after /tesseract/textpdf -endpoint**. Unlike other endpoints, this will create a file named by file_id (original file name).
+
+    POST ../tesseract/textpdf/combined?prefix=ocr_
+
+Optional prefix allows you to add prefix to file name.
 
 ### POST api/uploads/[UPLOAD_ID]/zip
 Create a zip archive with all files and directories produced by PDFSense

@@ -32,15 +32,16 @@ class PDFSense {
 		this.sharp_commands = SHARP_COMMANDS
 	}
 
-	async initialUpload(file, with_date) {
+	async initialUpload(file, query) {
 		var sanitize = require("sanitize-filename");
+		const prefix = query.prefix ? query.prefix : ''
 		const filename_clean = sanitize(file.name)
 		//const file_id = uuid()
 		try {
-			const file_id = this.createFileID(filename_clean, with_date)
+			const file_id = this.createFileID(filename_clean, query, prefix)
 			console.log(file_id)
 			await fsp.mkdir(path.join(ROOT, file_id))
-			const target_path = path.join(ROOT, file_id, filename_clean)
+			const target_path = path.join(ROOT, file_id, prefix + filename_clean)
 
 			await fsp.rename(file.path, target_path)
 			return {file_id: file_id, path: target_path}
@@ -50,12 +51,16 @@ class PDFSense {
 		}
 	}
 
-	createFileID(filename, with_date) {
-		if(!with_date) return filename
+	createFileID(filename, query, prefix) {
+
+		if(!query.with_date && !query.prefix) return filename
 		function pad2(n) { return n < 10 ? '0' + n : n }
 		var date = new Date();
 		var t = date.getFullYear().toString() +'_'+ pad2(date.getMonth() + 1) +'_'+ pad2( date.getDate()) +'_'+ pad2(date.getHours()) + ':' + pad2(date.getMinutes()) + ':' + pad2( date.getSeconds() )
-		return filename + '____' + t
+		if(query.with_date)
+			return prefix + filename + '____' + t
+		else if(query.prefix)
+			return prefix + filename
 	}
 
 	async removeUpload(file_id) {
@@ -324,32 +329,46 @@ class PDFSense {
 		return result
 	}
 
-	async combinePDFs(params, options, url_path, query) {
+	async combinePDFs(params, options, url_path, query, combine2original) {
 		const file_id = params.fileid
+		const prefix = query.prefix ? query.prefix : ''
 		const command_path = `/combined`
 		var p = url_path.split(file_id)[1]
-		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
-		const out_path =  path.join(ROOT, file_id, p)
-		await fsp.mkdir(out_path, { recursive: true })
-		//var dirs = await this.getDirList('./')
-		//console.log(dirs)
-		// find out where textonly PDF is (ocr.pdf)
-		var dirs = []
-		for await (const f of this.getTextPdfDirs(path.join(ROOT, file_id))) {
-  			console.log(f);
-			dirs.push(f)
-		}
-		console.log(dirs)
+		var input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		var out_path =  path.join(ROOT, file_id, p)
 		var result = {}
-		if(dirs.length > 0) {
-			var args = ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',dirs[dirs.length-1] + '/ocr.pdf','--',out_path + '/full.pdf']
-			result = await this.spawn('qpdf', args)
-			result.used_textonlypdf = dirs[dirs.length-1]
-			if(dirs.length > 1) {
-				result.textonlypdf_dirs = dirs
-				//result.hint = "You can select textonlypdf by parameter 'textonly=[ARRAY INDEX]'"
+
+		await fsp.mkdir(out_path, { recursive: true })
+
+		// combine ocr.pdf to the original pdf
+		if(combine2original) {
+			const original_path = path.join(ROOT, file_id, file_id)
+			var qpdf_args = [original_path, '--underlay', input_path + '/ocr.pdf','--',out_path + '/' + prefix + file_id]
+			result = await this.spawn('qpdf', qpdf_args)
+
+		// combine PDF created froma images to ocr.pdf
+		} else {
+
+
+			// find out where textonly PDF is (ocr.pdf)
+			var dirs = []
+			for await (const f of this.getTextPdfDirs(path.join(ROOT, file_id))) {
+	  			console.log(f);
+				dirs.push(f)
 			}
+			var result = {}
+			if(dirs.length > 0) {
+				var qpdf_args = ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',dirs[dirs.length-1] + '/ocr.pdf','--',out_path + 'full.pdf']
+				result = await this.spawn('qpdf', qpdf_args)
+				result.used_textonlypdf = dirs[dirs.length-1]
+				if(dirs.length > 1) {
+					result.textonlypdf_dirs = dirs
+					//result.hint = "You can select textonlypdf by parameter 'textonly=[ARRAY INDEX]'"
+				}
+			}
+
 		}
+
 		await fsp.writeFile(path.join(out_path, 'qpdf.cli'), result.cli, 'utf8')
 		await fsp.writeFile(path.join(out_path, 'qpdf.log'), result.log.join('\n'), 'utf8')
 		return result
@@ -482,6 +501,24 @@ class PDFSense {
 		archive.finalize()
 
 		return end;
+	}
+
+	async getFile(file_id, filename, ctx) {
+		var p = ctx.path.split(file_id)[1]
+		var input_path = path.join(ROOT, file_id, p, filename)
+		console.log(input_path)
+		const src = fs.createReadStream(input_path);
+		ctx.attachment(filename)
+        ctx.response.set("content-type", "application/octet-stream");
+        ctx.response.body = src;
+		src.pipe(ctx.res);
+
+		var end = new Promise(function(resolve, reject) {
+		    src.on('close', () => { console.log('finish'); resolve()});
+		    src.on('error', reject);
+		});
+
+		return end
 	}
 
 	getFilenameFromFileID(file_id) {

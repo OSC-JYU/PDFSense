@@ -34,7 +34,7 @@ class Batch {
 		var files = await pdfsense.getFileList(query.dir, '', ['.pdf'])
 		const process_path = req_path.split('/api/batch/')[1]
 		var query_str = querystring.stringify(query)
-		
+
 		for(var file of files) {
 			try {
 				const file_id = await this.copyFile(query.dir, file)
@@ -52,9 +52,6 @@ class Batch {
 				throw(e)
 			}
 		}
-
-
-
 		return files
 	}
 
@@ -81,7 +78,6 @@ class Batch {
 			if(i % 2) {
 				commands.push(tmp.join('/'))
 			}
-
 		}
 		return commands
 
