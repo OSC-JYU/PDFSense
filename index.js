@@ -121,8 +121,6 @@ router.post('/api/uploads/:fileid/rendered/:resolution', async function (ctx) {
 	ctx.body = result
 })
 
-
-
 router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
 	const result = await pdfsense.extractTextFromPDF(ctx.params.fileid, ctx.body)
 	ctx.body = {}
@@ -146,6 +144,12 @@ router.post('/api/uploads/:fileid/zip', async function (ctx) {
 });
 
 // catch sharp commands
+// router.post('/api/uploads/:fileid/flatten',async function (ctx, next) {
+// 	const result = await pdfsense.flatten(ctx.params, ctx.request.body, ctx.path, ctx.query)
+// 	ctx.body = result
+// });
+
+// catch sharp commands
 router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
 	const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
@@ -164,6 +168,11 @@ router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async funct
 
 router.post('/api/uploads/:fileid/(.*)/tesseract/textpdf/combined',async function (ctx, next) {
 	const result = await pdfsense.combinePDFs(ctx.params, ctx.request.body, ctx.path, ctx.query, true)
+	ctx.body = result
+});
+
+router.post('/api/uploads/:fileid/(.*)/orientation/_angle_',async function (ctx, next) {
+	const result = await pdfsense.detectOrientation(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
 

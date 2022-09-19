@@ -176,6 +176,7 @@ class PDFSense {
 		return out
 	}
 
+
 	async tesseract(params, options, url_path, query) {
 		const file_id = params.fileid
 		const command_path = `/tesseract/${params.tesseract_command}`
@@ -203,7 +204,7 @@ class PDFSense {
 			if(!options.c) options.c = {}
 			options.c['textonly_pdf'] = 1
 			await this.tesseractToPDF(files, options, out_path, 'ocr')
-		} else {
+		} else if(params.tesseract_command === 'text') {
 			await this.tesseractToText(files, options, out_path, '')
 		}
 	}
@@ -251,7 +252,54 @@ class PDFSense {
 		return 'done'
 	}
 
-	tesseract_spawn(filelist, options, out_path, outfile) {
+
+	async detectOrientation(params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/orientation/_angle_`
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p + '/')
+		var filelist = await this.getFileList(input_path, input_path)
+		var result = {log: [], data: [], cli: '', exitcode: ''}
+		options.psm = 0
+		var degrees = {0: 0, 90: 0, 180: 0, 270: 0}
+		for(const f of filelist) {
+			const used = process.memoryUsage().heapUsed / 1024 / 1024;
+			console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
+			console.log('processing ' + f)
+			try {
+				await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), 'outfile', result)
+
+				if(result.data[0].includes('Orientation in degrees:')) {
+ 					console.log('ORIENTATION')
+					var data = result.data[0].split('\n')
+					try {
+						var degree = parseInt(data[1].replace('Orientation in degrees:',''))
+						console.log(degree)
+						degrees[degree]++
+						console.log(degrees)
+					} catch(e) {
+						throw(e)
+					}
+
+				}
+
+				result.data  = []
+				//await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
+				//
+				//await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
+			} catch(e) {
+				console.log(e)
+				await fsp.writeFile(path.join(out_path, 'ocr.cli'), e.cli.join(' '), 'utf8')
+				await fsp.writeFile(path.join(out_path, 'ocr.log'), e.log.join(' '), 'utf8')
+			}
+		}
+		console.log(degrees)
+	}
+
+
+
+	tesseract_spawn(filelist, options, out_path, outfile, result) {
 		const spawn = require("child_process").spawn
 		var args = []
 		if(options.c) {
@@ -264,12 +312,19 @@ class PDFSense {
 			args.push('-l')
 			args.push(options.lang)
 		}
+
 		if(Array.isArray(filelist)) args.push(path.join(out_path, 'files.txt'))
 		else args.push(filelist)
-		args.push(path.join(out_path, outfile))
+		//args.push(path.join(out_path, outfile))
 		if(options.pdf) args.push('pdf')
-		var result = {log: [], cli: '', exitcode: ''}
+		if(options.psm ===  0) {
+			args.push('-')
+			args.push('--psm')
+			args.push(0)
+		}
 
+
+		console.log(args)
 		return new Promise((resolve, reject) => {
 			 var child = spawn('tesseract', args);
 			 console.log(child.spawnargs)
@@ -278,6 +333,8 @@ class PDFSense {
 			child.stdout.setEncoding('utf8');
 	 		child.stdout.on('data', function (data) {
 	 			console.log('stdout: ' + data);
+				//result.log.push(child.spawnargs)
+				result.data.push(data)
 	 		});
 			child.stderr.setEncoding('utf8');
 	 		child.stderr.on('data', function (data) {
