@@ -12,6 +12,8 @@ const { Poppler } 	= require("node-poppler");
 const finished = util.promisify(stream.finished);
 
 const ROOT = 'data'
+// rendering resolution for images used in orientation detection
+const ORIENTATION_RESOLUTION = 300
 
 const SHARP_COMMANDS = {
 	rotate: {'angle': 90},
@@ -32,24 +34,32 @@ class PDFSense {
 		this.sharp_commands = SHARP_COMMANDS
 	}
 
+
 	async initialUpload(file, query) {
 		var sanitize = require("sanitize-filename");
 		const prefix = query.prefix ? query.prefix : ''
 		const filename_clean = sanitize(file.name)
+		var file_id = ''
+		var target_path = ''
 		//const file_id = uuid()
 		try {
-			const file_id = this.createFileID(filename_clean, query, prefix)
+			file_id = this.createFileID(filename_clean, query, prefix)
 			console.log(file_id)
 			await fsp.mkdir(path.join(ROOT, file_id))
-			const target_path = path.join(ROOT, file_id, prefix + filename_clean)
+			target_path = path.join(ROOT, file_id, prefix + filename_clean)
 
 			await fsp.rename(file.path, target_path)
 			return {file_id: file_id, path: target_path}
 		} catch (e) {
 			await fsp.unlink(file.path) // remove uploaded file
-			throw(e)
+			if(e.code == 'EEXIST') {
+				return {file_id: file_id, path: target_path}
+			} else {
+				throw(e)
+			}
 		}
 	}
+
 
 	createFileID(filename, query, prefix) {
 
@@ -63,61 +73,83 @@ class PDFSense {
 			return prefix + filename
 	}
 
+
 	async removeUpload(file_id) {
 		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
 	}
 
-	async extractImagesFromPDF(file_id, options, query) {
-		options.jpegFile = true
-		if(query.format && query.format === 'png') options.pngFile = true
-		if(query.format && query.format === 'tiff') options.tiffFile = true
-		var filename = this.getFilenameFromFileID(file_id)
-		const input_path = path.join(ROOT, file_id)
-		const output_path = 'extracted/images'
+
+	async getPaths(params, new_path) {
+		const paths = {}
+		paths.filename = this.getFilenameFromFileID(params.fileid)
+		paths.input_path = path.join(ROOT, params.fileid)
+		paths.output_path = path.join(ROOT, params.fileid, new_path)
+		// orientation
+		if(params.orientation) {
+			if(!await this.exists(path.join(paths.input_path, 'orientation', params.orientation))) {
+				throw('Orientation path not found: ' + path.join(paths.input_path, 'orientation', params.orientation))
+			}
+			paths.output_path = path.join(ROOT, params.fileid, 'orientation', params.orientation, new_path)
+		}
+		console.log(paths)
+		return paths
+	}
+
+
+	async extractImagesFromPDF(params, options, query) {
+		const {filename, input_path, output_path} = await this.getPaths(params, 'extracted/images')
+		if(await this.exists(output_path)) throw(`Output directory exists (${output_path})`)
 		const filepath = path.join(input_path, filename)
-		if(!await this.exists(filepath)) throw('Upload path not found!')
+		if(await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
+
+		if(query.format && query.format === 'jpg') options.jpegFile = true
+		else if(query.format && query.format === 'tiff') options.tiffFile = true
+		else options.pngFile = true
+
 		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
 		await this.PDFImages(filepath, path.join(input_path, output_path), options)
-		var files = await this.getFileList(path.join(input_path, output_path), '', ['.jpg','.png','.tiff','.ppm','.pbm','.ccitt'])
+		var files = await this.getImageList(path.join(input_path, output_path), '', ['.jpg','.png','.tiff','.ppm','.pbm','.ccitt'])
 		var response = {files: files}
 		return response
 	}
 
-	async extractTextFromPDF(file_id, options) {
-		var filename = this.getFilenameFromFileID(file_id)
-		const input_path = path.join(ROOT, file_id)
-		const output_path = 'extracted/text'
+
+	async extractTextFromPDF(params, options) {
+		const {filename, input_path, output_path} = await this.getPaths(params, 'extracted/text')
+		if(await this.exists(output_path)) throw(`Output directory exists (${output_path})`)
 		const filepath = path.join(input_path, filename)
-		if(!await this.exists(filepath)) throw(`Upload path not found! file: ${file_id}`)
-		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
-		await this.PDFToText(filepath, path.join(input_path, output_path))
-		var files = await fsp.readdir(path.join(input_path, output_path))
+		if(await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
+
+		await fsp.mkdir(output_path, { recursive: true })
+		await this.PDFToText(filepath, output_path)
+		var files = await fsp.readdir(output_path)
 		var response = {files: files}
 		return response
 	}
+
 
 	async renderImagesFromPDF(params, options, query) {
 		if(!params.resolution || !parseInt(params.resolution)) throw('Invalid render resolution (must be integer)')
+		const {filename, input_path, output_path} = await this.getPaths(params, 'rendered/' + params.resolution)
+		if(await this.exists(output_path)) throw(`Output directory exists (${output_path})`)
 
 		options.resolutionXYAxis = parseInt(params.resolution)
 		if(query.format && ['jpg', 'jpeg'].includes(query.format)) options.jpegFile = true
 		else options.pngFile = true
 		if(!options.cropBox) options.cropBox = true
 
-		var filename = this.getFilenameFromFileID(params.fileid)
-		const input_path = path.join(ROOT, params.fileid)
-		const output_path = 'rendered/' + options.resolutionXYAxis
 		const filepath = path.join(input_path, filename)
-		if(!await this.exists(filepath)) throw('Upload path not found!')
-		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
+		if(!await this.exists(filepath)) throw('PDF file not found: ' + filepath)
+		await fsp.mkdir(output_path, { recursive: true })
+		console.log(output_path)
 
-		//await this.PDFToPpm(filepath, path.join(input_path, output_path), options)
 		const poppler = new Poppler('/usr/bin/');
-		await poppler.pdfToPpm(filepath, path.join(input_path, output_path) + '/page', options);
-		var files = await this.getFileList(path.join(input_path, output_path), '')
+		await poppler.pdfToPpm(filepath, output_path + '/page', options);
+		var files = await this.getImageList(output_path, '')
 		var response = {files: files}
 		return response
 	}
+
 
 	async sharp(params, options, url_path, query) {
 		const file_id = params.fileid
@@ -125,7 +157,7 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
-		var files = await this.getFileList(input_path, '')
+		var files = await this.getImageList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
 		var angle = 90
 		if(query.angle) {
@@ -161,6 +193,7 @@ class PDFSense {
 		}
 	}
 
+
 	getParams(query, command) {
 		var out = null
 		if(command in SHARP_COMMANDS) {
@@ -183,7 +216,9 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p + '/')
-		var files = await this.getFileList(input_path, input_path)
+		var files = await this.getImageList(input_path, input_path)
+
+		if(await this.exists(out_path)) throw(`Output directory exists (${out_path})`)
 
 		try {
 			await fsp.mkdir(out_path, { recursive: true })
@@ -209,9 +244,10 @@ class PDFSense {
 		}
 	}
 
+
 	async tesseractToText(filelist, options, out_path, outfile) {
 
-		let result = {}
+		var result = {log: [], data: [], cli: '', exitcode: ''}
 		for(const f of filelist) {
 			const used = process.memoryUsage().heapUsed / 1024 / 1024;
 			console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
@@ -219,7 +255,7 @@ class PDFSense {
 			//const text = await tesseract.recognize(f, options)
 			try {
 				console.log(options)
-				result = await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), outfile)
+				await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), outfile, result)
 				await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
 				await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
 			} catch(e) {
@@ -237,10 +273,11 @@ class PDFSense {
 		return 'done'
 	}
 
+
 	async tesseractToPDF(filelist, options, out_path, outfile) {
-		var result = {}
+		var result = {log: [], data: [], cli: '', exitcode: ''}
 		try {
-			result = await this.tesseract_spawn(filelist, options, out_path, outfile)
+			await this.tesseract_spawn(filelist, options, out_path, outfile, result)
 			await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
 			await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join('\n'), 'utf8')
 		} catch(e) {
@@ -253,16 +290,52 @@ class PDFSense {
 	}
 
 
+	async getPageCountFromPDF(filepath) {
+		const poppler = new Poppler('/usr/bin/');
+		var info = await poppler.pdfInfo(filepath, {});
+		const regex = /Pages:( *)([0-9]*)/gm
+		var page_count = 0
+		let m;
+
+		while ((m = regex.exec(info)) !== null) {
+			// This is necessary to avoid infinite loops with zero-width matches
+			if (m.index === regex.lastIndex) {
+				regex.lastIndex++;
+			}
+
+			if(m[2] && parseInt(m[2])) page_count = parseInt(m[2])
+			else console.log('Could not find page count from info')
+		}
+		return page_count
+	}
+
+
 	async detectOrientation(params, options, url_path, query) {
+		if(!params.resolution || !parseInt(params.resolution)) throw('Invalid orientation render resolution (must be integer)')
 		const file_id = params.fileid
-		const command_path = `/orientation/_angle_`
+		const command_path = `/orientation/${params.resolution}`
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
-		const out_path =  path.join(ROOT, file_id, p + '/')
-		var filelist = await this.getFileList(input_path, input_path)
+		const out_path =  path.join(ROOT, file_id, p.replace(params.resolution,'') + '/')
+		await fsp.mkdir(out_path)
+
+		var filename = this.getFilenameFromFileID(file_id)
+		const filepath = path.join(input_path, filename)
+		console.log('filepath: ' + filepath)
+		console.log('out: ' + path.join(input_path, out_path))
+
+		var page_count = await this.getPageCountFromPDF(filepath)
+
+		var options = {resolutionXYAxis: parseInt(params.resolution), jpegFile: true}
+		const poppler = new Poppler('/usr/bin/');
+		await poppler.pdfToPpm(filepath, out_path + '/page', options);
+
+
+		var filelist = await this.getImageList(out_path, out_path)
 		var result = {log: [], data: [], cli: '', exitcode: ''}
 		options.psm = 0
-		var degrees = {0: 0, 90: 0, 180: 0, 270: 0}
+		var degrees = []
+		const data_txt_stream = fs.createWriteStream(path.join(out_path, 'data.txt'), { flags: 'a' })
 		for(const f of filelist) {
 			const used = process.memoryUsage().heapUsed / 1024 / 1024;
 			console.log(`The script uses approximately ${Math.round(used * 100) / 100} MB`);
@@ -270,33 +343,56 @@ class PDFSense {
 			try {
 				await this.tesseract_spawn(f, options, path.join(out_path, path.basename(f)), 'outfile', result)
 
-				if(result.data[0].includes('Orientation in degrees:')) {
- 					console.log('ORIENTATION')
+				if(result.data && result.data.length && result.data[0].includes('Orientation in degrees:')) {
 					var data = result.data[0].split('\n')
 					try {
 						var degree = parseInt(data[1].replace('Orientation in degrees:',''))
-						console.log(degree)
-						degrees[degree]++
-						console.log(degrees)
+						degrees.push(degree)
 					} catch(e) {
 						throw(e)
 					}
-
 				}
-
+				data_txt_stream.write(path.join(out_path, path.basename(f)) + '\n')
+				data_txt_stream.write(result.data.join(' '))
+				//await fsp.appendFile(path.join(out_path, 'data.txt'), result.data.join(' '), 'utf8')
+				await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
 				result.data  = []
-				//await fsp.writeFile(path.join(out_path, 'ocr.cli'), result.cli.join(' '), 'utf8')
-				//
-				//await fsp.writeFile(path.join(out_path, 'ocr.log'), result.log.join(' '), 'utf8')
 			} catch(e) {
 				console.log(e)
 				await fsp.writeFile(path.join(out_path, 'ocr.cli'), e.cli.join(' '), 'utf8')
 				await fsp.writeFile(path.join(out_path, 'ocr.log'), e.log.join(' '), 'utf8')
 			}
 		}
-		console.log(degrees)
-	}
 
+
+		// check the most common orientation and create directory for it
+		const counts = {}
+		degrees.forEach(function (x) { counts[x] = (counts[x] || 0) + 1; });
+		var max = 0
+		var angle = null
+		for(var key in counts) {
+  			if(counts[key] > max) {
+				max = counts[key]
+				angle = key
+			}
+		}
+		if(angle) {
+			data_txt_stream.write('\nORIENTATIONS FOUND:\n' + JSON.stringify(counts))
+			data_txt_stream.write('\nCreating directory ' + angle)
+			data_txt_stream.close()
+			console.log('Creating directory ' + angle)
+			const image_path = path.join(out_path, angle, 'rendered', params.resolution)
+			await fsp.mkdir(image_path, { recursive: true })
+			await this.moveFiles(out_path, image_path)
+		} else {
+			data_txt_stream.write('\nOrientation not found!')
+			data_txt_stream.close()
+			console.log('Orientation not found')
+			throw('Orientation not found!')
+		}
+
+		//await fsp.copyFile(filepath, path.join(out_path, angle, filename))
+	}
 
 
 	tesseract_spawn(filelist, options, out_path, outfile, result) {
@@ -365,7 +461,7 @@ class PDFSense {
 		console.log(input_path)
 		const out_path =  path.join(ROOT, file_id, p)
 		await fsp.mkdir(out_path, { recursive: true })
-		var filelist = await this.getFileList(input_path, input_path)
+		var filelist = await this.getImageList(input_path, input_path)
 		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist.join('\n'), 'utf8')
 		var result = {log: [], cli: []}
 
@@ -385,6 +481,7 @@ class PDFSense {
 		await fsp.writeFile(path.join(out_path, 'noteshrink.log'), result.log.join('\n'), 'utf8')
 		return result
 	}
+
 
 	async combinePDFs(params, options, url_path, query, combine2original) {
 		const file_id = params.fileid
@@ -432,6 +529,7 @@ class PDFSense {
 
 	}
 
+
 	async images2PDF(params, options, url_path, query) {
 		const file_id = params.fileid
 		const command_path = `/pdf`
@@ -440,7 +538,7 @@ class PDFSense {
 		console.log(input_path)
 		const out_path =  path.join(ROOT, file_id, p)
 		await fsp.mkdir(out_path, { recursive: true })
-		var filelist = await this.getFileList(input_path, input_path)
+		var filelist = await this.getImageList(input_path, input_path)
 		await fsp.writeFile(path.join(out_path, 'files.txt'), filelist, 'utf8')
 		filelist.push('-o')
 		filelist.push(out_path + '/images.pdf')
@@ -449,6 +547,7 @@ class PDFSense {
 		await fsp.writeFile(path.join(out_path, 'convert.log'), result.log.join('\n'), 'utf8')
 		return result
 	}
+
 
 	spawn(command, args) {
 		const spawn = require("child_process").spawn
@@ -485,8 +584,8 @@ class PDFSense {
 		 })
 	}
 
-	async PDFImages(filepath, outpath, options) {
 
+	async PDFImages(filepath, outpath, options) {
 		if(!options) {
 			options = {
 				allFiles: true
@@ -495,9 +594,6 @@ class PDFSense {
 		const poppler = new Poppler('/usr/bin/');
 		console.log(outpath)
 		await poppler.pdfImages(filepath, outpath + '/page', options)
-		// then OCR those toImages
-
-		// create new PDF
 	}
 
 
@@ -508,8 +604,8 @@ class PDFSense {
 		}
 		const poppler = new Poppler('/usr/bin/');
 		await poppler.pdfToText(filepath, outpath + '/text.txt', options);
-
 	}
+
 
 	async getArchive(file_id, ctx) {
 		var filename = this.getFilenameFromFileID(file_id)
@@ -527,8 +623,8 @@ class PDFSense {
 		});
 
 		return end
-
 	}
+
 
 	async createArchive(file_id, ctx) {
 		const archiver = require('archiver');
@@ -560,6 +656,7 @@ class PDFSense {
 		return end;
 	}
 
+
 	async getFile(file_id, filename, ctx) {
 		var p = ctx.path.split(file_id)[1]
 		var input_path = path.join(ROOT, file_id, p, filename)
@@ -578,11 +675,25 @@ class PDFSense {
 		return end
 	}
 
+
 	getFilenameFromFileID(file_id) {
 		return file_id.split('____')[0]
 	}
 
-	async getFileList(input_path, fullpath, filter) {
+	async moveFiles(input_path, out_path, filter) {
+		if(!filter) filter = ['.png','.jpg','.tiff']
+		var files = await fsp.readdir(input_path, { withFileTypes: true })
+		var filelist = files
+			.filter(dirent => dirent.isFile())
+			.map(dirent => dirent.name)
+			.filter(f => filter.includes(path.extname(f)))
+
+		for(var file of filelist) {
+			await fsp.rename(path.join(input_path, file), path.join(out_path, file))
+		}
+	}
+
+	async getImageList(input_path, fullpath, filter) {
 		console.log(input_path)
 		if(!filter) filter = ['.png','.jpg','.tiff']
 		var files = await fsp.readdir(input_path, { withFileTypes: true })
@@ -593,12 +704,14 @@ class PDFSense {
 			.map(x => path.join(fullpath, x))
 	}
 
+
 	async getDirList(input_path) {
 		var files = await fsp.readdir(path.join(ROOT, input_path), { withFileTypes: true })
 		return files
 			.filter(dirent => !dirent.isFile())
         	.map(dirent => dirent.name)
 	}
+
 
 	async * getTextPdfDirs(dir) {
 		const dirents = await fsp.readdir(dir, { withFileTypes: true });
@@ -610,6 +723,7 @@ class PDFSense {
 			}
 		}
 	}
+
 
 	async exists (path) {
 		try {

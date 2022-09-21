@@ -112,8 +112,13 @@ router.post('/api/uploads', async function (ctx) {
 });
 
 router.post('/api/uploads/:fileid/extracted/images', async function (ctx) {
-	const result = await pdfsense.extractImagesFromPDF(ctx.params.fileid, ctx.request.body, ctx.query)
+	const result = await pdfsense.extractImagesFromPDF(ctx.params, ctx.request.body, ctx.query)
 	ctx.body = result
+})
+
+router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
+	const result = await pdfsense.extractTextFromPDF(ctx.params, ctx.body)
+	ctx.body = {}
 })
 
 router.post('/api/uploads/:fileid/rendered/:resolution', async function (ctx) {
@@ -121,8 +126,24 @@ router.post('/api/uploads/:fileid/rendered/:resolution', async function (ctx) {
 	ctx.body = result
 })
 
-router.post('/api/uploads/:fileid/extracted/text', async function (ctx) {
-	const result = await pdfsense.extractTextFromPDF(ctx.params.fileid, ctx.body)
+router.post('/api/uploads/:fileid/orientation/:resolution',async function (ctx, next) {
+	const result = await pdfsense.detectOrientation(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+});
+
+router.post('/api/uploads/:fileid/orientation/:orientation/extracted/images', async function (ctx) {
+	const result = await pdfsense.extractImagesFromPDF(ctx.params, ctx.request.body, ctx.query)
+	ctx.body = result
+})
+
+router.post('/api/uploads/:fileid/orientation/:orientation/rendered/:resolution', async function (ctx) {
+	const result = await pdfsense.renderImagesFromPDF(ctx.params, ctx.request.body, ctx.query)
+	ctx.body = result
+})
+
+
+router.post('/api/uploads/:fileid/orientation/:orientation/extracted/text', async function (ctx) {
+	const result = await pdfsense.extractTextFromPDF(ctx.params, ctx.body)
 	ctx.body = {}
 })
 
@@ -168,11 +189,6 @@ router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async funct
 
 router.post('/api/uploads/:fileid/(.*)/tesseract/textpdf/combined',async function (ctx, next) {
 	const result = await pdfsense.combinePDFs(ctx.params, ctx.request.body, ctx.path, ctx.query, true)
-	ctx.body = result
-});
-
-router.post('/api/uploads/:fileid/(.*)/orientation/_angle_',async function (ctx, next) {
-	const result = await pdfsense.detectOrientation(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
 

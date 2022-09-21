@@ -167,6 +167,17 @@ Renders images from PDF with resolution defined in path. For example:
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
+### POST api/uploads/[UPLOAD_ID]/orientation/[RESOLUTION]
+Sometimes orientation of crappy digitalisations could be sideways. Orientation endpoint makes it possible to divide processing paths based on orientation when making batch editing.
+
+Call orientation endpoint after upload. The endpoint creates a directory 'orientation/[ANGLE]'. This allows processing different orientations different ways.
+
+	http POST api/uploads/my.pdf/orientation/300
+
+This will create a command path 'api/uploads/my.pdf/orientation/0/rendered/300' if the orientation is 0. Likewise, if orientation is 90, the path would be 'api/uploads/my.pdf/orientation/90/rendered/300'.
+
+As you see, the end of the orientation path is same as if you rendered images from PDF with resolution 300 (rendered/300). The explanation is that rendered images are used for orientation detection and after detection, images are copied to rendered/300 directory, so they can be further processed without rendering again.
+
 ### POST ../sharp/[COMMAND]
 Use sharp for processing images. Add to extracted or rendered images path.
 
