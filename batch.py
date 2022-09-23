@@ -70,7 +70,10 @@ def readDir():
                         # download files from combined if /combined is last endpoint
                         c = commands[len(commands)-1]
                         if '/combined' in c:
-                            download_file(f"{URL}/{fileid}{c}/{prefix}{fileid}", os.path.join(args.dir, 'output', fileid))
+                            try:
+                                download_file(f"{URL}/{fileid}{c}/{prefix}{fileid}", os.path.join(args.dir, 'output', fileid))
+                            except:
+                                print('Download failed')
                         else:
                             print('no /combined found, not downloading')
 
