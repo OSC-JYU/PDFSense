@@ -75,7 +75,7 @@ class PDFSense {
 
 
 	async removeUpload(file_id) {
-		fs.rmdirSync(path.join(ROOT, file_id), { recursive: true });
+		fsp.rm(path.join(ROOT, file_id), { recursive: true });
 	}
 
 
@@ -100,15 +100,15 @@ class PDFSense {
 		const {filename, input_path, output_path} = await this.getPaths(params, 'extracted/images')
 		if(await this.exists(output_path)) throw(`Output directory exists (${output_path})`)
 		const filepath = path.join(input_path, filename)
-		if(await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
+		if(!await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
 
 		if(query.format && query.format === 'jpg') options.jpegFile = true
 		else if(query.format && query.format === 'tiff') options.tiffFile = true
 		else options.pngFile = true
 
-		await fsp.mkdir(path.join(input_path, output_path), { recursive: true })
-		await this.PDFImages(filepath, path.join(input_path, output_path), options)
-		var files = await this.getImageList(path.join(input_path, output_path), '', ['.jpg','.png','.tiff','.ppm','.pbm','.ccitt'])
+		await fsp.mkdir(output_path, { recursive: true })
+		await this.PDFImages(filepath, output_path, options)
+		var files = await this.getImageList(output_path, '', ['.jpg','.png','.tiff','.ppm','.pbm','.ccitt'])
 		var response = {files: files}
 		return response
 	}
@@ -118,7 +118,7 @@ class PDFSense {
 		const {filename, input_path, output_path} = await this.getPaths(params, 'extracted/text')
 		if(await this.exists(output_path)) throw(`Output directory exists (${output_path})`)
 		const filepath = path.join(input_path, filename)
-		if(await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
+		if(!await this.exists(filepath)) throw(`PDF file not found! file: ${params.fileid}`)
 
 		await fsp.mkdir(output_path, { recursive: true })
 		await this.PDFToText(filepath, output_path)
@@ -151,6 +151,25 @@ class PDFSense {
 	}
 
 
+	async process_sharp(params, options, url_path, query) {
+		const file_id = params.fileid
+		var splitted = url_path.split('/')
+		var command = splitted[splitted.length-2]
+		const command_path = `${command}/${params.parameter}`
+
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		const out_path =  path.join(ROOT, file_id, p)
+		var files = await this.getImageList(input_path, '')
+		await fsp.mkdir(out_path, { recursive: true })
+
+		for(const f of files) {
+			//console.log(`${commands[0]} ${this.getParams(query,commands[0])} ${f} `)
+			await sharp(path.join(input_path, f))[command](parseInt(params.parameter)).toFile(path.join(out_path, f))
+		}
+	}
+
+
 	async sharp(params, options, url_path, query) {
 		const file_id = params.fileid
 		const command_path = `/sharp/${params.sharp_command}`
@@ -159,10 +178,6 @@ class PDFSense {
 		const out_path =  path.join(ROOT, file_id, p)
 		var files = await this.getImageList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
-		var angle = 90
-		if(query.angle) {
-			angle = parseInt(query.angle)
-		}
 
 		var commands = params.sharp_command.split('_')
 		if(commands.length == 1) {

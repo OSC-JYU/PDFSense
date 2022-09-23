@@ -170,11 +170,17 @@ router.post('/api/uploads/:fileid/zip', async function (ctx) {
 // 	ctx.body = result
 // });
 
-// catch sharp commands
-router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
-	const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
+// image processing endpoints with parameter
+router.post('/api/uploads/:fileid/(.*)/(rotate|trim|blur|sharpen)/:parameter',async function (ctx, next) {
+	const result = await pdfsense.process_sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
+
+// catch sharp commands
+//router.post('/api/uploads/:fileid/(.*)/sharp/:sharp_command',async function (ctx, next) {
+	//const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	//ctx.body = result
+//});
 
 router.get('/api/uploads/:fileid/(.*)/sharp',async function (ctx, next) {
 	//const result = await pdfsense.sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
