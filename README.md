@@ -1,5 +1,5 @@
-# PDFSense
-A Simple and stateful backend for text extraction, image extraction, noteshrinking, and OCR of PDF files
+# PDFSense (Work in progress)
+A Simple and stateful backend for text extraction, image extraction, noteshrinking, and making OCR of PDF files
 
 PDFSense combines several open source PDF, image and text tools to one REST API. It tries to use sensible defaults, so that you could get good results without tinkering with the settings.
 
@@ -14,7 +14,7 @@ PDFSense **stores the output of every endpoint** as a directory tree (thats' why
 	│       │       ├── noteshrink.cli
 	│       │       ├── noteshrink.log
 	│       │       ├── page-000.png
-	│       │       └── tesseract
+	│       │       └── ocr
 	│       │           └── textpdf
 	│       │               ├── files.txt
 	│       │               ├── ocr.cli
@@ -48,11 +48,61 @@ Get source, build image and start
 	make build
 	make start
 
+## Get started
+
+Upload your first PDF:
+
+    curl -F "file=@myfile.pdf" http://localhost:8200/api/uploads
+
+Render your PDF as images with resolution 150 dpi:
+
+    curl -X POST http://localhost:8200/api/uploads/myfile.pdf/rendered/150
+
+Now you can find rendered images from data/uploads/myfile.pdf/rendered/150
+
+You can continue processing with rendered images. Let's rotate images and create a new PDF from rotated images:
+
+    curl -X POST http://localhost:8200/api/uploads/myfile.pdf/rendered/150/rotate/90
+	curl -X POST http://localhost:8200/api/uploads/myfile.pdf/rendered/150/rotate/90/pdf
+
+Now you should have a PDF file with pages that are sideways on data/uploads/myfile.pdf/rendered/300/rotate/90/pdf/images.pdf
 
 ## Command path API
-PDFSense uses weird but handy command path API. You first upload your PDF to /api/uploads (see below), then you can continue processing by using the file id which can be found from the response. You can then continut prosessing by stacking commands in the path.
+PDFSense uses weird but handy command path REST API. You first upload your PDF to /api/uploads, then you can continue processing by using the file id which can be found from the response. You can then continue prosessing by stacking commands in the path.
 
 PDFSense includes also a python script, which allows you easily **batch process** several files.
+
+### Image processing commands
+
+ - /rotate/:angle (integer)         Rotate images (using sharp)
+ - /blur/:sigma (integer)           Blur images (using sharp)
+ - /sharpen/:sigma (integer)        Sharpen images (using sharp)
+ - /threshold/:threshold (integer)  Threshold (using sharp)
+ - /trim/:threshold (integer)       Trim images
+
+Image processing commands without parameters:
+
+ - /grayscale   Turn images to grayscale images (using sharp)
+ - /flip        Flip images vertically (using sharp)
+ - /flop        Flop images horizontally (using sharp)
+ - /negate      Invert colors (using sharp)
+
+### PDF Extracting Commands
+
+ - /extracted/images (pdfimages)
+ - /extracted/text
+ - /rendered/:resolution
+
+### OCR commands
+
+  - /ocr/text?lang=[LANG]
+  - /ocr/pdf?lang=[LANG]
+  - /ocr/textpdf?lang=[LANG]
+
+### PDF generation Commands
+ - /pdf Create pdf from images
+ - /combined Create searchable pdf from images by adding overlay from /ocr/textpdf end point when run after any image endpoint.
+ - /combined Create searchable pdf from original pdf when run after /ocr/textpdf endpoint
 
 ### 1. Initial upload of original input file
 
@@ -122,8 +172,8 @@ Here is a commands that OCR files and then creates a searchable pdf by using the
 
     commands = [
     '/rendered/300',
-    '/rendered/300/tesseract/textpdf?lang=fin',
-    '/rendered/300/tesseract/textpdf/combined'
+    '/rendered/300/ocr/textpdf?lang=fin',
+    '/rendered/300/ocr/textpdf/combined'
     ]
 
 So just write paths as they would be when processing files directly through API.
@@ -167,6 +217,17 @@ Renders images from PDF with resolution defined in path. For example:
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
+### POST api/uploads/[UPLOAD_ID]/orientation/[RESOLUTION]
+Sometimes orientation of crappy digitalisations could be sideways. Orientation endpoint makes it possible to divide processing paths based on orientation when making batch editing.
+
+Call orientation endpoint after upload. The endpoint creates a directory 'orientation/[ANGLE]'. This allows processing different orientations different ways.
+
+	http POST api/uploads/my.pdf/orientation/300
+
+This will create a command path 'api/uploads/my.pdf/orientation/0/rendered/300' if the orientation is 0. Likewise, if orientation is 90, the path would be 'api/uploads/my.pdf/orientation/90/rendered/300'.
+
+As you see, the end of the orientation path is same as if you rendered images from PDF with resolution 300 (rendered/300). The explanation is that rendered images are used for orientation detection and after detection, images are copied to rendered/300 directory, so they can be further processed without rendering again.
+
 ### POST ../sharp/[COMMAND]
 Use sharp for processing images. Add to extracted or rendered images path.
 
@@ -195,7 +256,7 @@ Apply noteshrink to images (excellent for improving bad b/w scans)
 
 	http POST api/uploads/my.pdf/rendered/300/noteshrink/images
 
-### POST ../tesseract/[text|pdf|textpdf]?lang=LANG_CODE
+### POST ../ocr/[text|pdf|textpdf]?lang=LANG_CODE
 Do OCR and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
 Note the language query parameter! Default language is 'eng'. **Make sure you have installed tesseract language package for your language** (see Dockerfile, eng, fin and swe are installed by default)
 
@@ -208,18 +269,18 @@ Generate PDF from images. For example:
 
 ### POST ../pdf/combined
 Create searchable PDF by adding text-only PDF to the PDF **generated from images**. This can be used for creating **searchable PDF with low resolution images**.
-Note that this creates a new PDF file. If you want to add text layer to the original file, then use /tesseract/textpdf/combined -endpoint.
+Note that this creates a new PDF file. If you want to add text layer to the original file, then use /ocr/textpdf/combined -endpoint.
 
 Run this from path where your image PDF is. For example:
 
 	POST api/uploads/my.pdf/rendered/100/pdf/combined
 
-PDFSense scans directory tree in order to find text only PDF (produced by /tesseract/textpdf -endpoint). That's why you should have only one text only PDF in your tree.
+PDFSense scans directory tree in order to find text only PDF (produced by /ocr/textpdf -endpoint). That's why you should have only one text only PDF in your tree.
 
 ### POST ../combined
-Create searchable pdf by adding text-only PDF as overlay to the copy of the original file. **This can be used only after /tesseract/textpdf -endpoint**. Unlike other endpoints, this will create a file named by file_id (original file name).
+Create searchable pdf by adding text-only PDF as overlay to the copy of the original file. **This can be used only after /ocr/textpdf -endpoint**. Unlike other endpoints, this will create a file named by file_id (original file name).
 
-    POST ../tesseract/textpdf/combined?prefix=ocr_
+    POST ../ocr/textpdf/combined?prefix=ocr_
 
 Optional prefix allows you to add prefix to file name.
 
