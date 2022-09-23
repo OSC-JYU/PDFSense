@@ -6,6 +6,7 @@ TODO:
 - /extracted/images need extracted/png and extracted/tiff endpoints
 - /combined there should be option to create searchable PDF with visible text but without images (original layout preserved).
 - /images/pdf creating new PDF from user's own images does not work since "Refusing to work on images with alpha channel"
+- add /rotate/pdf/ endpoint for rotating images in PDF (pdfjam)?
 
 
 PDF OCR

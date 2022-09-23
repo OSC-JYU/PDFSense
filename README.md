@@ -74,44 +74,47 @@ PDFSense includes also a python script, which allows you easily **batch process*
 
 ### Image processing commands
 
- - /rotate/:angle (integer)         Rotate images (using sharp)
- - /blur/:sigma (integer)           Blur images (using sharp)
- - /sharpen/:sigma (integer)        Sharpen images (using sharp)
- - /threshold/:threshold (integer)  Threshold (using sharp)
- - /trim/:threshold (integer)       Trim images
+ - **/rotate/:angle** (integer)         Rotate images (using sharp)
+ - **/blur/:sigma** (integer)           Blur images (using sharp)
+ - **/sharpen/:sigma** (integer)        Sharpen images (using sharp)
+ - **/threshold/:threshold** (integer)  Threshold (using sharp)
+ - **/trim/:threshold** (integer)       Trim images
 
 Image processing commands without parameters:
 
- - /grayscale   Turn images to grayscale images (using sharp)
- - /flip        Flip images vertically (using sharp)
- - /flop        Flop images horizontally (using sharp)
- - /negate      Invert colors (using sharp)
+ - **/grayscale**   Turn images to grayscale images (using sharp)
+ - **/flip**        Flip images vertically (using sharp)
+ - **/flop**        Flop images horizontally (using sharp)
+ - **/negate**      Invert colors (using sharp)
 
 ### PDF Extracting Commands
 
- - /extracted/images (pdfimages)
- - /extracted/text
- - /rendered/:resolution
+ - **/extracted/images** (pdfimages)
+ - **/extracted/text**
+ - **/rendered/:resolution**
 
 ### OCR commands
 
-  - /ocr/text?lang=[LANG]
-  - /ocr/pdf?lang=[LANG]
-  - /ocr/textpdf?lang=[LANG]
+  - **/ocr/text?lang=[LANG]** Create text file per page
+  - **/ocr/pdf?lang=[LANG]** Create searchable PDF from images
+  - **/ocr/textpdf?lang=[LANG]** Create text only (invisible text) PDF
 
 ### PDF generation Commands
- - /pdf Create pdf from images
- - /combined Create searchable pdf from images by adding overlay from /ocr/textpdf end point when run after any image endpoint.
- - /combined Create searchable pdf from original pdf when run after /ocr/textpdf endpoint
+ - **/pdf** Create pdf from images
+ - **/combined** Create searchable pdf from images by adding overlay from /ocr/textpdf end point when run after any image endpoint.
+ - **/combined** Create searchable pdf from original pdf when run after /ocr/textpdf endpoint
+
+## Workflow
 
 ### 1. Initial upload of original input file
 
 First we must upload the original PDF. This creates an unique file id which is used as a base path for actual processing commands.
-[httpie](https://httpie.io/):
+
+using [httpie](https://httpie.io/):
 
 	http --form POST :8200/api/uploads file@myfile.pdf
 
-curl:
+using curl:
 
 	curl -F "file=@myfile.pdf" http://localhost:8200/api/uploads
 
@@ -140,12 +143,14 @@ This returns a list of images
 We can now refer to extracted images by path "/api/uploads/myfile.pdf/extracted/images".
 We can further process the result of image extraction by adding a new command path to the path.
 
+Note that extracted images can have "strange" formats like ppm, formats which image processing endpoints can not handle. However, you can force extracted files to png format by adding "?format=png" to the end of the url.
+
 ### 3. Process images
 
 Let's apply some processing to these images. In this case let's test OCR.
-We add command **tesseract/text** to the path.
+We add command **ocr/text** to the path.
 
-        http POST :8200/api/uploads/myfile.pdf/extracted/images/tesseract/text?lang=fin
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/ocr/text?lang=fin
 
 This runs tesseract and creates one text file per image and additonal file called "fulltext.txt".
 
@@ -153,20 +158,20 @@ This runs tesseract and creates one text file per image and additonal file calle
 
 If the result of OCR was not satisfying, we must identify the problem and further process images. Let's say that our images had bad orientation and they must be rotated. We can do this by "sharp" command.
 
-We just remove the previous command from path (tesseract/text) and apply sharp command **sharp/rotate**.
+We just remove the previous command from path (ocr/text) and apply sharp command **rotate/:ANGLE**.
 
-        http POST :8200/api/uploads/myfile.pdf/extracted/images/sharp/rotate?angle=90
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/rotate/90
 
 After then we can try run OCR again for rotated images.
 
-        http POST :8200/api/uploads/myfile.pdf/extracted/images/sharp/rotate/tesseract/text?lang=fin
+        http POST :8200/api/uploads/myfile.pdf/extracted/images/rotate/90/ocr/text?lang=fin
 
-### 5. Batch processing
+## Batch processing
 
 After you have experimented different settings and you are getting decent result for couple of files, you may want to process more files with same settings.
 There is a simple python script (batch.py) included with PDFSense and it is located in 'python' directory.
 
-#### batch.py
+### batch.py
 
 Here is a commands that OCR files and then creates a searchable pdf by using the original PDF as a base and adding text-only PDF as overlay on it.
 
@@ -183,7 +188,7 @@ Here is an example that makes OCR for all files in 'pdf' directory. The result i
     python3 python/batch.py --dir ./my_files --download
 
 
-#### externally
+### externally
 PDFSense is an API and you can use whatever tools in order to call API and process multiple files one by one.
 
 ## Endpoints
@@ -217,39 +222,38 @@ Renders images from PDF with resolution defined in path. For example:
 
 Default output is png, but with option '?format=jpg' endpoint outputs images in jpg format.
 
-### POST api/uploads/[UPLOAD_ID]/orientation/[RESOLUTION]
+### POST api/uploads/[UPLOAD_ID]/orientation?resolution=[INTEGER]
 Sometimes orientation of crappy digitalisations could be sideways. Orientation endpoint makes it possible to divide processing paths based on orientation when making batch editing.
 
 Call orientation endpoint after upload. The endpoint creates a directory 'orientation/[ANGLE]'. This allows processing different orientations different ways.
 
-	http POST api/uploads/my.pdf/orientation/300
+	http POST api/uploads/my.pdf/orientation?resolution=300
 
 This will create a command path 'api/uploads/my.pdf/orientation/0/rendered/300' if the orientation is 0. Likewise, if orientation is 90, the path would be 'api/uploads/my.pdf/orientation/90/rendered/300'.
 
+This means that you can batch process pdf files differently based on their orientation. Just use batch.py and run it with different command sets per orientation. In other words, if orientation is 90, you have to rotate images by 90 degrees and then do the ocr etc. If orientation is 0, you do not need rotate step.
+
 As you see, the end of the orientation path is same as if you rendered images from PDF with resolution 300 (rendered/300). The explanation is that rendered images are used for orientation detection and after detection, images are copied to rendered/300 directory, so they can be further processed without rendering again.
 
-### POST ../sharp/[COMMAND]
+### POST ../IMAGE_PROCESSING_COMMAND/[COMMAND]
 Use sharp for processing images. Add to extracted or rendered images path.
 
-example: rotate rendered images 90 degree counter clockwise:
+example: rotate rendered images 90 degree clockwise:
 
-	http POST api/uploads/my.pdf/rendered/300/sharp/rotate?angle=-90
+	http POST api/uploads/my.pdf/rendered/300/rotate/90
 
 Commands and their parameters and default values:
 
 	rotate: {'angle': 90},
 	blur: {'sigma':1},
 	sharpen: {'sigma':1},
+	trim: {'trim_threshold':10},
+	threshold:{'threshold': 128}
 	flip: {},
 	flop: {},
-	trim: {'trim_threshold':10},
 	grayscale: {},
 	negate: {},
-	threshold:{'threshold': 128}
 
-You can also chain max. 3 commands to a single request like this:
-
-	http POST api/uploads/my.pdf/extracted/images/sharp/rotate_trim_threshold?angle=90&trim_threshold=50
 
 ### POST ../noteshrink/images
 Apply noteshrink to images (excellent for improving bad b/w scans)
@@ -257,10 +261,10 @@ Apply noteshrink to images (excellent for improving bad b/w scans)
 	http POST api/uploads/my.pdf/rendered/300/noteshrink/images
 
 ### POST ../ocr/[text|pdf|textpdf]?lang=LANG_CODE
-Do OCR and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
+Runs tesseract and output text file (text), regular PDF (pdf) or PDF with text only (textpdf).You can run all or just one.
 Note the language query parameter! Default language is 'eng'. **Make sure you have installed tesseract language package for your language** (see Dockerfile, eng, fin and swe are installed by default)
 
-	http POST api/uploads/my.pdf/rendered/300/noteshrink/images/tesseract/pdf?lang=fin
+	http POST api/uploads/my.pdf/rendered/300/noteshrink/images/ocr/pdf?lang=fin
 
 ### POST ../pdf
 Generate PDF from images. For example:
@@ -327,3 +331,15 @@ This happens when you run "**sudo** make start". The variable PWD is not then se
 
 Or, you can make sure that you can run docker commands as a regular user:
 https://docs.docker.com/engine/install/linux-postinstall/
+
+### I have some images and I want to create PDF file with these images. Can I do it?
+
+Yes, just create following file structure in data directory of PDFSense:
+
+    uploads/my_image_pdf/extracted/images
+
+Then copy your files to the images directory and then run:
+
+http POST :8200/api/uploads/my_image_pdf/extracted/images/pdf
+
+Note that images must jpg files, or png files WITHOUT alpha channel.
