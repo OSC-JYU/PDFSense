@@ -1,4 +1,13 @@
 
+TODO:
+- /orientation endpoint is really slow! May be evaluate only couple of pages... or find faster algorithm.
+- /ocr endpoints need way to create different directories based on settings (like rotate/:angle for example)
+- /noteshrink endpoint needs settings differentation also.
+- /extracted/images need extracted/png and extracted/tiff endpoints
+- /combined there should be option to create searchable PDF with visible text but without images (original layout preserved).
+- /images/pdf creating new PDF from user's own images does not work since "Refusing to work on images with alpha channel"
+
+
 PDF OCR
 
  mkdir images -p && pdftoppm -r 300 -cropbox 2000.pdf images/page
@@ -43,5 +52,5 @@ apt-get install python3-opencv
 
 Kraken OCR?
 
-page_dewarp:
+page_dewarp (requires opencv):
 https://github.com/mzucker/page_dewarp

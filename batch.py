@@ -8,18 +8,17 @@ import argparse
 
 URL = 'http://localhost:8200/api/uploads'
 
-# EDIT THIS!
-commands = [
-    '/orientation',
-    '/orientation/0/rendered/300',
-]
-
+# EDIT THIS and remember COMMA after each line!!!
 # commands = [
-#     '/orientation'
+#     '/orientation?resolution=300',
 #     '/orientation/0/rendered/300',
-#     '/orientation/0/rendered/300/tesseract/textpdf?lang=fin',
-#     '/orientation/0/rendered/300/tesseract/textpdf/combined'
 # ]
+
+commands = [
+    '/orientation?resolution=300',
+    '/orientation/0/rendered/300/ocr/textpdf?lang=fin',
+
+]
 
 parser = argparse.ArgumentParser(description='Batch processing with PDFSense')
 parser.add_argument('--dir', type=str, help='input directory', required=True)
@@ -63,7 +62,7 @@ def readDir():
                     counter += 1
                     fileid = r_json.get('fileid')
                     for command in commands:
-                        print(command)
+                        print(f"{URL}/{fileid}{command}")
                         r = requests.post(f"{URL}/{fileid}{command}")
                         print(r.status_code)
 

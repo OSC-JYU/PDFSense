@@ -15,6 +15,7 @@ const batch 		= new Batch()
 app.use(async function handleError(context, next) {
 
 	try {
+		console.log(context.path)
 		await next();
 	} catch (error) {
 		context.status = 500;
@@ -126,7 +127,7 @@ router.post('/api/uploads/:fileid/rendered/:resolution', async function (ctx) {
 	ctx.body = result
 })
 
-router.post('/api/uploads/:fileid/orientation/:resolution',async function (ctx, next) {
+router.post('/api/uploads/:fileid/orientation',async function (ctx, next) {
 	const result = await pdfsense.detectOrientation(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
@@ -171,7 +172,7 @@ router.post('/api/uploads/:fileid/zip', async function (ctx) {
 // });
 
 // image processing endpoints with parameter
-router.post('/api/uploads/:fileid/(.*)/(rotate|trim|blur|sharpen)/:parameter',async function (ctx, next) {
+router.post('/api/uploads/:fileid/(.*)/(rotate|trim|blur|sharpen|threshold)/:parameter',async function (ctx, next) {
 	const result = await pdfsense.process_sharp(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
@@ -188,12 +189,12 @@ router.get('/api/uploads/:fileid/(.*)/sharp',async function (ctx, next) {
 });
 
 // catch tesseract commands
-router.post('/api/uploads/:fileid/(.*)/tesseract/:tesseract_command',async function (ctx, next) {
+router.post('/api/uploads/:fileid/(.*)/ocr/:tesseract_command',async function (ctx, next) {
 	const result = await pdfsense.tesseract(ctx.params, ctx.request.body, ctx.path, ctx.query)
 	ctx.body = result
 });
 
-router.post('/api/uploads/:fileid/(.*)/tesseract/textpdf/combined',async function (ctx, next) {
+router.post('/api/uploads/:fileid/(.*)/ocr/textpdf/combined',async function (ctx, next) {
 	const result = await pdfsense.combinePDFs(ctx.params, ctx.request.body, ctx.path, ctx.query, true)
 	ctx.body = result
 });
