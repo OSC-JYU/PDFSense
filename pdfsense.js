@@ -339,7 +339,7 @@ class PDFSense {
 
 			child.stdout.setEncoding('utf8');
 	 		child.stdout.on('data', function (data) {
-	 			console.log('stdout: ' + data);
+	 			//console.log('stdout: ' + data);
 				//result.log.push(child.spawnargs)
 				result.data.push(data)
 	 		});
@@ -516,7 +516,7 @@ class PDFSense {
 		// combine ocr.pdf to the original pdf
 		if(combine2original) {
 			const original_path = path.join(ROOT, file_id, file_id)
-			var qpdf_args = [original_path, '--underlay', input_path + '/ocr.pdf','--',out_path + '/' + prefix + file_id]
+			var qpdf_args = [original_path, '--underlay', input_path + '/ocr.pdf','--',out_path + prefix + file_id]
 			result = await this.spawn('qpdf', qpdf_args)
 
 		// combine PDF created froma images to ocr.pdf
