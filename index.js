@@ -78,7 +78,7 @@ router.param('sharp_command', (output, ctx, next) => {
 
 router.param('tesseract_command', (output, ctx, next) => {
 	console.log('tesseract command found!')
-	if (!['pdf','text','textpdf'].includes(output)) throw(new Error('Tesseract path must end with /pdf or /text or /textpdf'))
+	if (!['pdf','text','textpdf', 'text+images'].includes(output)) throw(new Error('Tesseract path must end with /pdf or /text or /textpdf or /text+images'))
 	return next();
 })
 
@@ -111,6 +111,11 @@ router.post('/api/uploads', async function (ctx) {
 		size: file.size
 	}
 });
+
+router.post('/api/uploads/:fileid/filter/text', async function (ctx) {
+	const result = await pdfsense.ghostScript(ctx.params, ctx.request.body, ctx.path, ctx.query)
+	ctx.body = result
+})
 
 router.post('/api/uploads/:fileid/extracted/images', async function (ctx) {
 	const result = await pdfsense.extractImagesFromPDF(ctx.params, ctx.request.body, ctx.query)

@@ -52,7 +52,8 @@ class PDFSense {
 		} catch (e) {
 			await fsp.unlink(file.path) // remove uploaded file
 			if(e.code == 'EEXIST') {
-				return {file_id: file_id, path: target_path}
+				//return {file_id: file_id, path: target_path}
+				throw(e)
 			} else {
 				throw(e)
 			}
@@ -159,6 +160,7 @@ class PDFSense {
 
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		if(!await this.exists(input_path)) throw(`Input directory not found (${input_path})`)
 		const out_path =  path.join(ROOT, file_id, p)
 		var files = await this.getImageList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
@@ -176,6 +178,7 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p)
+		if(!await this.exists(input_path)) throw(`Input directory not found (${input_path})`)
 		var files = await this.getImageList(input_path, '')
 		await fsp.mkdir(out_path, { recursive: true })
 
@@ -257,6 +260,10 @@ class PDFSense {
 			options.c['textonly_pdf'] = 1
 			await this.tesseractToPDF(filelist, options, out_path, 'ocr')
 		} else if(params.tesseract_command === 'text') {
+			await this.tesseractToText(filelist, options, out_path, '')
+		} else if(params.tesseract_command === 'text+images') {
+			if(!options.c) options.c = {}
+			options.c['tessedit_write_images'] = 1
 			await this.tesseractToText(filelist, options, out_path, '')
 		}
 	}
@@ -391,6 +398,7 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		const out_path =  path.join(ROOT, file_id, p + '/')
+		if(!await this.exists(input_path)) throw(`Input directory not found (${input_path})`)
 		await fsp.mkdir(out_path)
 
 		var filename = this.getFilenameFromFileID(file_id)
@@ -458,6 +466,7 @@ class PDFSense {
 			console.log('Creating image directory ' + image_path)
 			await fsp.mkdir(image_path, { recursive: true })
 			await this.moveFiles(out_path, image_path)
+			return {path: image_path, angle: angle}
 		} else {
 			data_txt_stream.write('\nOrientation not found!')
 			data_txt_stream.close()
@@ -500,6 +509,19 @@ class PDFSense {
 		return result
 	}
 
+	async ghostScript (params, options, url_path, query) {
+		const file_id = params.fileid
+		const command_path = `/filter/text`
+		console.log(command_path)
+		var p = url_path.split(file_id)[1]
+		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
+		console.log(input_path)
+		const out_path =  path.join(ROOT, file_id, p)
+		await fsp.mkdir(out_path, { recursive: true })
+		var gs_args = ['-o', out_path + '/textless.pdf', '-sDEVICE=pdfwrite', '-dFILTERTEXT',path.join(input_path, file_id)]
+		var result = await this.spawn('gs', gs_args)
+		console.log(result)
+	}
 
 	async combinePDFs(params, options, url_path, query, combine2original) {
 		const file_id = params.fileid
@@ -512,17 +534,23 @@ class PDFSense {
 		var result = {}
 
 		await fsp.mkdir(out_path, { recursive: true })
+		const combined_path = path.join(out_path, 'combined.pdf')
 
 		// combine ocr.pdf to the original pdf
 		if(combine2original) {
 			const original_path = path.join(ROOT, file_id, file_id)
-			var qpdf_args = [original_path, '--underlay', input_path + '/ocr.pdf','--',out_path + prefix + file_id]
+			const textless_path = path.join(out_path,  'textless.pdf')
+
+			// We always remove previous text from original pdf
+			var gs_args = ['-o', textless_path , '-sDEVICE=pdfwrite', '-dFILTERTEXT', original_path]
+			var textless_result = await this.spawn('gs', gs_args)
+			console.log(textless_result)
+			var qpdf_args = [textless_path, '--underlay', input_path + '/ocr.pdf', '--', combined_path]
 			result = await this.spawn('qpdf', qpdf_args)
 
 		// combine PDF created froma images to ocr.pdf
 		} else {
-
-
+			const imagepdf_path = path.join(input_path, 'images.pdf')
 			// find out where textonly PDF is (ocr.pdf)
 			var dirs = []
 			for await (const f of this.getTextPdfDirs(path.join(ROOT, file_id))) {
@@ -531,7 +559,7 @@ class PDFSense {
 			}
 			var result = {}
 			if(dirs.length > 0) {
-				var qpdf_args = ['--empty', '--pages', input_path + '/images.pdf', '--', '--underlay',dirs[dirs.length-1] + '/ocr.pdf','--',out_path + 'full.pdf']
+				var qpdf_args = ['--empty', '--pages', imagepdf_path, '--', '--underlay',dirs[dirs.length-1] + '/ocr.pdf','--', combined_path]
 				result = await this.spawn('qpdf', qpdf_args)
 				result.used_textonlypdf = dirs[dirs.length-1]
 				if(dirs.length > 1) {
@@ -554,6 +582,7 @@ class PDFSense {
 		var p = url_path.split(file_id)[1]
 		const input_path = path.join(ROOT, file_id, p.replace(command_path,''))
 		console.log(input_path)
+		if(!await this.exists(input_path)) throw(`Input directory not found (${input_path})`)
 		const out_path =  path.join(ROOT, file_id, p)
 		await fsp.mkdir(out_path, { recursive: true })
 		var filelist = await this.getImageList(input_path, input_path, ['.jpg', 'jpeg', '.png', '.tiff', '.tif', '.ppm'])
@@ -679,11 +708,12 @@ class PDFSense {
 
 	async getFile(file_id, filename, ctx) {
 		var p = ctx.path.split(file_id)[1]
-		var input_path = path.join(ROOT, file_id, p, filename)
+		var input_path = path.join(ROOT, file_id, p)
 		console.log(input_path)
 		const src = fs.createReadStream(input_path);
 		ctx.attachment(filename)
-        ctx.response.set("content-type", "application/octet-stream");
+		if(filename.includes('.pdf')) ctx.response.set("content-type", "application/pdf");
+        else ctx.response.set("content-type", "application/octet-stream");
         ctx.response.body = src;
 		src.pipe(ctx.res);
 
@@ -715,12 +745,12 @@ class PDFSense {
 
 	async getImageList(input_path, fullpath, filter) {
 		console.log(input_path)
-		if(!filter) filter = ['.png','.jpg','.tiff']
+		if(!filter) filter = ['.png','.jpg', '.jpeg', '.tiff']
 		var files = await fsp.readdir(input_path, { withFileTypes: true })
 		return files
 			.filter(dirent => dirent.isFile())
         	.map(dirent => dirent.name)
-			.filter(f => filter.includes(path.extname(f)))
+			.filter(f => filter.includes(path.extname(f).toLowerCase()))
 			.map(x => path.join(fullpath, x))
 	}
 

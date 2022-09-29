@@ -55,3 +55,7 @@ Kraken OCR?
 
 page_dewarp (requires opencv):
 https://github.com/mzucker/page_dewarp
+
+remove text:
+https://stackoverflow.com/questions/24322338/remove-all-text-from-pdf-file
+gs -o no-more-texts.pdf -sDEVICE=pdfwrite -dFILTERTEXT original.pdf
